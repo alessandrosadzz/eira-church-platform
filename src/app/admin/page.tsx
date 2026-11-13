@@ -542,14 +542,14 @@ export default function AdminPage() {
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-xs font-bold uppercase tracking-tight text-[#E4E4E7] mb-1.5">
-                Usuário ou E-mail
+                Seu usuário
               </label>
               <input
                 type="text"
                 required
                 value={usuarioLogin}
                 onChange={(e) => setUsuarioLogin(e.target.value)}
-                placeholder="pastores, admin ou seu usuário"
+                placeholder="Seu usuário"
                 className="w-full h-12 px-3.5 rounded-lg bg-[#1D1D23] border border-[#2E2E35] text-sm text-[#FAFAFA] placeholder-[#71717A] focus:outline-none focus:ring-2 focus:ring-[var(--accent,#FACC15)] focus:border-transparent transition-all"
               />
             </div>
@@ -673,40 +673,6 @@ export default function AdminPage() {
               </div>
             </div>
           )}
-
-          {/* Orientações Oficiais de Acesso */}
-          <div className="p-3.5 rounded-lg bg-[#1D1D23] border border-[#2E2E35] text-[11px] text-[#A1A1AA] space-y-1.5">
-            <div className="flex items-center space-x-1.5 text-[#FAFAFA] font-bold">
-              <ShieldCheck className="w-3.5 h-3.5 text-[var(--accent,#FACC15)]" />
-              <span>Instruções de Acesso:</span>
-            </div>
-            <p>
-              • <strong>Pastores:</strong> usuário <code className="bg-[#141418] px-1 py-0.5 rounded text-[var(--accent,#FACC15)] font-bold">pastores</code>
-            </p>
-            <p>
-              • <strong>Administração:</strong> usuário <code className="bg-[#141418] px-1 py-0.5 rounded text-[var(--accent,#FACC15)] font-bold">admin</code>
-            </p>
-            <p>
-              • <strong>Líder de Rede (12):</strong> usuário <code className="bg-[#141418] px-1 py-0.5 rounded text-[var(--accent,#FACC15)] font-bold">lider12</code> ou suas credenciais individuais
-            </p>
-            <p>
-              • <strong>Equipe Conexão:</strong> usuário <code className="bg-[#141418] px-1 py-0.5 rounded text-[var(--accent,#FACC15)] font-bold">conexao</code> (Acolhimento & Visitantes)
-            </p>
-            <div className="pt-1.5 border-t border-[#2E2E35] space-y-1 text-[#E4E4E7]">
-              <p>
-                • <strong>Líder de Célula:</strong>{' '}
-                <Link href="/cadastro-lider-celula" className="text-[var(--accent,#FACC15)] font-bold underline">
-                  Cadastrar Célula e Acesso →
-                </Link>
-              </p>
-              <p>
-                • <strong>Líder de 12:</strong>{' '}
-                <Link href="/cadastro-lider-12" className="text-[var(--accent,#FACC15)] font-bold underline">
-                  Cadastrar Rede de 12 e Acesso →
-                </Link>
-              </p>
-            </div>
-          </div>
 
           <div className="text-center pt-1">
             <Link
