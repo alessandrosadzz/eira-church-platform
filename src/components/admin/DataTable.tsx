@@ -295,34 +295,63 @@ export const DataTable: React.FC<DataTableProps> = ({
         <Modal
           isOpen={true}
           onClose={() => setParticipanteDetalhes(null)}
-          titulo="Ficha Completa do Participante"
-          subtitulo={`Inscrição: ${participanteDetalhes.comprovante_hash || participanteDetalhes.id.slice(0, 8)}`}
-          maxWidth="lg"
-        >
-          <div className="space-y-4 text-left text-sm max-h-[75vh] overflow-y-auto pr-1">
-            {/* Cabeçalho com Status e Nome */}
-            <div className="p-4 rounded-xl bg-[#FAFAFA] border border-[#E4E4E7] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center space-x-2">
-                  <h3 className="text-xl font-extrabold text-[#0A0A0A]">
-                    {participanteDetalhes.nome}
-                  </h3>
-                  {participanteDetalhes.idade && (
-                    <span className="px-2 py-0.5 rounded text-xs font-black bg-black text-[var(--accent,#FACC15)]">
-                      {participanteDetalhes.idade} ANOS
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-[#71717A] mt-0.5">
-                  {participanteDetalhes.rede_participante ? `Rede ${participanteDetalhes.rede_participante}` : 'Rede Geral'} • Inscrito em {formatarDataHora(participanteDetalhes.created_at)}
-                </p>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Badge status={participanteDetalhes.status} />
-              </div>
+          titulo={participanteDetalhes.nome}
+          headerExtra={
+            <div className="flex items-center space-x-2">
+              {participanteDetalhes.idade && (
+                <span className="px-2 py-0.5 rounded text-xs font-black bg-black text-[var(--accent,#FACC15)]">
+                  {participanteDetalhes.idade} ANOS
+                </span>
+              )}
+              <Badge status={participanteDetalhes.status} />
             </div>
+          }
+          subtitulo={`${participanteDetalhes.rede_participante ? 'Rede ' + participanteDetalhes.rede_participante : 'Rede Geral'} • Inscrição: ${participanteDetalhes.comprovante_hash || participanteDetalhes.id.slice(0, 8)} • Inscrito em ${formatarDataHora(participanteDetalhes.created_at)}`}
+          maxWidth="lg"
+          footer={
+            <div className="w-full flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center space-x-2">
+                {participanteDetalhes.telefone && (
+                  <a
+                    href={`https://wa.me/55${participanteDetalhes.telefone.replace(/\D/g, '')}?text=${encodeURIComponent(
+                      `Olá ${participanteDetalhes.nome.split(' ')[0]}! Aqui é da equipe da Eira Church sobre sua inscrição no ${participanteDetalhes.evento?.nome || 'evento'}!`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3.5 py-2 rounded-lg text-xs font-bold bg-[#22C55E] text-white hover:bg-[#16A34A] inline-flex items-center gap-1.5 shadow-xs"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    <span>WhatsApp do Participante</span>
+                  </a>
+                )}
 
+                {participanteDetalhes.status === 'pendente' && podeConfirmarBaixa && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => {
+                      const p = participanteDetalhes;
+                      setParticipanteDetalhes(null);
+                      onAbrirBaixaManual(p);
+                    }}
+                  >
+                    <CheckCircle className="w-3.5 h-3.5 mr-1" />
+                    <span>Confirmar Pagamento</span>
+                  </Button>
+                )}
+              </div>
+
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setParticipanteDetalhes(null)}
+              >
+                Fechar
+              </Button>
+            </div>
+          }
+        >
+          <div className="space-y-4 text-left text-sm">
             {/* SEÇÃO NOBRE: OBSERVAÇÕES DE SAÚDE, ALERGIAS E REMÉDIOS */}
             <div className={`p-4 rounded-xl border ${
               participanteDetalhes.observacoes_saude
@@ -406,13 +435,13 @@ export const DataTable: React.FC<DataTableProps> = ({
                 </span>
                 <div className="text-xs space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-[#71717A]">Participa de Célula?</span>
+                    <span className="text-[#71717A]">Você já participa de célula?</span>
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                       participanteDetalhes.participa_celula
                         ? 'bg-[#DCFCE7] text-[#166534] border border-[#BBF7D0]'
                         : 'bg-[#F4F4F5] text-[#71717A]'
                     }`}>
-                      {participanteDetalhes.participa_celula ? 'Sim, participa' : 'Não participa'}
+                      {participanteDetalhes.participa_celula ? 'Sim, já participo' : 'Ainda não'}
                     </span>
                   </div>
 
@@ -513,48 +542,6 @@ export const DataTable: React.FC<DataTableProps> = ({
                   </button>
                 </div>
               )}
-            </div>
-
-            {/* BOTÕES DE AÇÃO NO RODAPÉ DO MODAL */}
-            <div className="pt-3 border-t border-[#E4E4E7] flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center space-x-2">
-                {participanteDetalhes.telefone && (
-                  <a
-                    href={`https://wa.me/55${participanteDetalhes.telefone.replace(/\D/g, '')}?text=${encodeURIComponent(
-                      `Olá ${participanteDetalhes.nome.split(' ')[0]}! Aqui é da equipe da Eira Church sobre sua inscrição no ${participanteDetalhes.evento?.nome || 'evento'}!`
-                    )}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-3.5 py-2 rounded-lg text-xs font-bold bg-[#22C55E] text-white hover:bg-[#16A34A] inline-flex items-center gap-1.5 shadow-xs"
-                  >
-                    <MessageCircle className="w-3.5 h-3.5" />
-                    <span>WhatsApp do Participante</span>
-                  </a>
-                )}
-
-                {participanteDetalhes.status === 'pendente' && podeConfirmarBaixa && (
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => {
-                      const p = participanteDetalhes;
-                      setParticipanteDetalhes(null);
-                      onAbrirBaixaManual(p);
-                    }}
-                  >
-                    <CheckCircle className="w-3.5 h-3.5 mr-1" />
-                    <span>Confirmar Pagamento</span>
-                  </Button>
-                )}
-              </div>
-
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setParticipanteDetalhes(null)}
-              >
-                Fechar
-              </Button>
             </div>
           </div>
         </Modal>
