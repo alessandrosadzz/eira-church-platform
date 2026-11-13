@@ -100,7 +100,7 @@ export default function HomePage() {
       {/* ==================================================== */}
       {/* 1. CABEÇALHO PÚBLICO */}
       {/* ==================================================== */}
-      <header className="w-full bg-white border-b border-[#E4E4E7] sticky top-0 z-30">
+      <header className="w-full bg-white/95 backdrop-blur-md border-b border-[#E4E4E7] sticky top-0 z-30 shadow-xs">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             {igrejaConfig.logoUrl ? (
@@ -369,12 +369,27 @@ export default function HomePage() {
 
                 <div className="space-y-1 text-xs">
                   <p className="font-extrabold text-sm text-white">
-                    {igrejaConfig.endereco.logradouro}
+                    {igrejaConfig.endereco?.logradouro || 'Rua Anita Garibaldi, 850'}
                   </p>
                   <p className="text-[#A1A1AA]">
-                    {igrejaConfig.endereco.bairro} • {igrejaConfig.endereco.cidade}
+                    {[igrejaConfig.endereco?.bairro || 'Anita Garibaldi', igrejaConfig.endereco?.cidade || 'Joinville - SC'].filter(Boolean).join(' • ')}
                   </p>
-                  <p className="text-[#71717A]">CEP: {igrejaConfig.endereco.cep}</p>
+                  {(igrejaConfig.endereco?.cep || '89203-300') && (
+                    <p className="text-[#71717A]">CEP: {igrejaConfig.endereco?.cep || '89203-300'}</p>
+                  )}
+                  {igrejaConfig.endereco?.mapsUrl && (
+                    <div className="pt-2">
+                      <a
+                        href={igrejaConfig.endereco.mapsUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center space-x-1.5 text-xs font-bold text-[var(--accent,#FACC15)] hover:underline"
+                      >
+                        <span>Abrir no Google Maps</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+                  )}
                 </div>
               </div>
 

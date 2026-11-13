@@ -335,6 +335,8 @@ export async function buscarInscricoesSupabase(): Promise<Inscricao[]> {
           metodo_pag: (row.metodo_pagamento as MetodoPagamento) || 'pix',
           comprovante_hash: row.codigo_inscricao,
           comprovante_url: comprovantesMap[row.codigo_inscricao] || comprovantesMap[row.id] || null,
+          role: extra.role || null,
+          usuario: extra.usuario || null,
           created_at: row.data_inscricao || row.created_at,
           evento: {
             nome: row.evento?.nome || 'Evento Geral',
@@ -816,24 +818,63 @@ export async function atualizarFuncaoLiderSupabase(dados: {
     }
   }
 
-  // Se for promovida a líder de célula e não tiver célula ainda
-  if (dados.novaFuncao === 'lider_celula' && !celulaAtualizada && dados.celulaNome) {
+  // 2. Se for promovida e não possuir registro ministerial prévio, cria entrada no Supabase
+  if (dados.novaFuncao !== 'membro' && !celulaAtualizada) {
+    const nomeGrupo =
+      dados.novaFuncao === 'conexao'
+        ? 'Equipe Conexão // Acolhimento'
+        : dados.novaFuncao === 'lider_12'
+        ? `Rede 12 // ${nomeLimpo}`
+        : dados.novaFuncao === 'lider_celula'
+        ? (dados.celulaNome || `Célula ${nomeLimpo}`)
+        : dados.novaFuncao === 'pastor'
+        ? 'Corpo Pastoral Eira'
+        : 'Administração Geral';
+
     await salvarCelulaSupabase({
-      nome: dados.celulaNome,
-      rede: dados.rede || 'Geral',
+      nome: nomeGrupo,
+      rede: dados.novaFuncao === 'conexao' ? 'Conexão' : ((dados.rede as any) || 'Geral'),
       lider_nome: nomeLimpo,
       lider_telefone: dados.telefone || '',
-      dia_semana: 'Quinta-feira',
-      horario: '20h00',
-      bairro: 'Centro',
-      endereco: 'Joinville, SC',
+      dia_semana: 'Domingo',
+      horario: '19h00',
+      bairro: 'Joinville',
+      endereco: 'Eira Church',
+      maps_url: 'https://maps.google.com/?q=Joinville+-+SC',
       usuarioAcesso: dados.novoUsuario,
-      senhaAcesso: dados.novaSenha,
-      role: 'lider_celula',
+      senhaAcesso: dados.novaSenha || 'eira@1212',
+      role: dados.novaFuncao,
     });
   }
 
-  // 2. Atualiza conta de liderança no LocalStorage (eira_lideres)
+  // 3. Atualiza inscrições vinculadas a esta pessoa para refletir o papel imediatamente
+  try {
+    const { data: inscricoesEncontradas } = await supabase
+      .from('inscricoes')
+      .select('id, cpf')
+      .ilike('nome', `%${nomeLimpo}%`);
+
+    if (inscricoesEncontradas && inscricoesEncontradas.length > 0) {
+      for (const inscRow of inscricoesEncontradas) {
+        let cpfMeta: any = {};
+        if (inscRow.cpf && typeof inscRow.cpf === 'string' && inscRow.cpf.trim().startsWith('{')) {
+          try {
+            cpfMeta = JSON.parse(inscRow.cpf);
+          } catch {}
+        }
+        cpfMeta.role = dados.novaFuncao;
+        if (dados.novoUsuario) cpfMeta.usuario = dados.novoUsuario;
+        if (dados.novaSenha) cpfMeta.senha = dados.novaSenha;
+
+        await supabase
+          .from('inscricoes')
+          .update({ cpf: JSON.stringify(cpfMeta) })
+          .eq('id', inscRow.id);
+      }
+    }
+  } catch {}
+
+  // 4. Atualiza conta de liderança no LocalStorage (eira_lideres)
   if (typeof window !== 'undefined') {
     try {
       const lideresSalvos: any[] = JSON.parse(
@@ -863,8 +904,8 @@ export async function atualizarFuncaoLiderSupabase(dados: {
           usuarioOuEmail: usuarioValido,
           senha: dados.novaSenha || (idx >= 0 ? lideresSalvos[idx].senha : 'eira@1212'),
           telefone: dados.telefone || (idx >= 0 ? lideresSalvos[idx].telefone : ''),
-          celulaNome: dados.celulaNome || (idx >= 0 ? lideresSalvos[idx].celulaNome : 'Célula Eira'),
-          rede: dados.rede || (idx >= 0 ? lideresSalvos[idx].rede : 'Geral'),
+          celulaNome: dados.novaFuncao === 'conexao' ? '' : (dados.celulaNome || (idx >= 0 ? lideresSalvos[idx].celulaNome : 'Célula Eira')),
+          rede: dados.novaFuncao === 'conexao' ? 'Conexão' : (dados.rede || (idx >= 0 ? lideresSalvos[idx].rede : 'Geral')),
           role: dados.novaFuncao,
           criadoEm: idx >= 0 ? lideresSalvos[idx].criadoEm : new Date().toISOString(),
         };
@@ -878,6 +919,89 @@ export async function atualizarFuncaoLiderSupabase(dados: {
       }
     } catch {}
   }
+}
+
+/**
+ * Atualiza a senha de um usuário no Supabase e no LocalStorage.
+ */
+export async function atualizarSenhaUsuarioSupabase(
+  nomeOuUsuario: string,
+  novaSenha: string
+): Promise<boolean> {
+  const termo = nomeOuUsuario.trim().toLowerCase();
+  let sucesso = false;
+
+  // 1. Atualiza no LocalStorage
+  if (typeof window !== 'undefined') {
+    try {
+      const salvos: any[] = JSON.parse(localStorage.getItem('eira_lideres') || '[]');
+      let modificado = false;
+      const atualizados = salvos.map((l) => {
+        if (
+          l.nome?.toLowerCase().trim() === termo ||
+          l.usuarioOuEmail?.toLowerCase().trim() === termo
+        ) {
+          modificado = true;
+          return { ...l, senha: novaSenha };
+        }
+        return l;
+      });
+      if (modificado) {
+        localStorage.setItem('eira_lideres', JSON.stringify(atualizados));
+        sucesso = true;
+      }
+    } catch {}
+  }
+
+  // 2. Atualiza em celulas no Supabase
+  try {
+    const { data: celulasDB } = await supabase.from('celulas').select('id, anfitriao, lider_nome');
+    if (celulasDB && celulasDB.length > 0) {
+      for (const c of celulasDB) {
+        let meta: any = {};
+        if (c.anfitriao && typeof c.anfitriao === 'string' && c.anfitriao.trim().startsWith('{')) {
+          try {
+            meta = JSON.parse(c.anfitriao);
+          } catch {}
+        }
+        const bateNome = c.lider_nome?.toLowerCase().trim() === termo;
+        const bateUser = meta.usuario?.toLowerCase().trim() === termo;
+        if (bateNome || bateUser) {
+          meta.senha = novaSenha;
+          await supabase.from('celulas').update({ anfitriao: JSON.stringify(meta) }).eq('id', c.id);
+          sucesso = true;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Erro ao atualizar senha em celulas:', e);
+  }
+
+  // 3. Atualiza em inscricoes no Supabase
+  try {
+    const { data: inscsDB } = await supabase.from('inscricoes').select('id, cpf, nome');
+    if (inscsDB && inscsDB.length > 0) {
+      for (const i of inscsDB) {
+        let meta: any = {};
+        if (i.cpf && typeof i.cpf === 'string' && i.cpf.trim().startsWith('{')) {
+          try {
+            meta = JSON.parse(i.cpf);
+          } catch {}
+        }
+        const bateNome = i.nome?.toLowerCase().trim() === termo;
+        const bateUser = meta.usuario?.toLowerCase().trim() === termo;
+        if (bateNome || bateUser) {
+          meta.senha = novaSenha;
+          await supabase.from('inscricoes').update({ cpf: JSON.stringify(meta) }).eq('id', i.id);
+          sucesso = true;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Erro ao atualizar senha em inscricoes:', e);
+  }
+
+  return sucesso;
 }
 
 export async function removerCelulaSupabase(celulaId: string): Promise<void> {

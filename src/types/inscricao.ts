@@ -30,6 +30,8 @@ export interface Inscricao {
   mp_preference_id?: string | null;
   comprovante_hash?: string;
   comprovante_url?: string | null;
+  role?: string | null;
+  usuario?: string | null;
   created_at: string;
   updated_at?: string;
   evento?: Pick<Evento, 'nome' | 'categoria' | 'rede' | 'valor'>;

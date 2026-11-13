@@ -58,6 +58,9 @@ import {
   Info,
   CalendarCheck,
   Crown,
+  Key,
+  X,
+  MessageCircle,
 } from 'lucide-react';
 
 export default function AdminPage() {
@@ -88,6 +91,8 @@ export default function AdminPage() {
   const [senhaLogin, setSenhaLogin] = useState('');
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [usuarioNomeLogado, setUsuarioNomeLogado] = useState('');
+  const [modalEsqueciSenha, setModalEsqueciSenha] = useState(false);
+  const [recuperarUser, setRecuperarUser] = useState('');
 
   // Verifica se há sessão ativa salva no navegador
   useEffect(() => {
@@ -571,6 +576,15 @@ export default function AdminPage() {
                   {mostrarSenha ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              <div className="flex items-center justify-end mt-1.5">
+                <button
+                  type="button"
+                  onClick={() => setModalEsqueciSenha(true)}
+                  className="text-xs text-[var(--accent,#FACC15)] hover:underline font-semibold cursor-pointer"
+                >
+                  Esqueci minha senha?
+                </button>
+              </div>
             </div>
 
             <Button type="submit" variant="primary" fullWidth size="lg">
@@ -578,6 +592,87 @@ export default function AdminPage() {
               <span>Entrar no Painel</span>
             </Button>
           </form>
+
+          {/* Modal de Recuperação de Senha */}
+          {modalEsqueciSenha && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fadeIn">
+              <div className="w-full max-w-md bg-[#18181B] border border-[#2E2E35] rounded-[var(--radius-box,0.75rem)] shadow-2xl p-6 space-y-4 text-left text-white">
+                <div className="flex items-center justify-between border-b border-[#2E2E35] pb-3">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-2 rounded-lg bg-[var(--accent,#FACC15)]/10 text-[var(--accent,#FACC15)]">
+                      <Key className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-extrabold text-white">
+                        Recuperação de Senha
+                      </h3>
+                      <p className="text-xs text-[#A1A1AA]">
+                        Painel da Liderança // Eira Church
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setModalEsqueciSenha(false)}
+                    className="p-1.5 rounded-lg text-[#71717A] hover:text-white hover:bg-[#27272A] transition-colors cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-3 text-xs text-[#D4D4D8]">
+                  <p>
+                    As senhas da liderança e membros são gerenciadas com segurança pelos <strong>Pastores e Administradores da Igreja</strong>.
+                  </p>
+                  <div className="p-3 rounded-lg bg-[#27272A] border border-[#3F3F46] space-y-1.5">
+                    <span className="font-bold text-[var(--accent,#FACC15)] block">
+                      Como redefinir sua senha:
+                    </span>
+                    <p>
+                      1. Informe seu usuário ou WhatsApp abaixo.
+                    </p>
+                    <p>
+                      2. Clique em <strong>"Solicitar aos Pastores via WhatsApp"</strong> para que a diretoria redefina suas credenciais no painel em tempo real.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-tight text-[#E4E4E7] mb-1">
+                      Seu Nome ou Usuário de Acesso
+                    </label>
+                    <input
+                      type="text"
+                      value={recuperarUser}
+                      onChange={(e) => setRecuperarUser(e.target.value)}
+                      placeholder="Ex: Gabriel Silva ou gabriel.silva"
+                      className="w-full h-11 px-3 rounded-lg bg-[#141418] border border-[#2E2E35] text-white text-xs placeholder-[#71717A] focus:outline-none focus:ring-2 focus:ring-[var(--accent,#FACC15)]"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-2 pt-2 border-t border-[#2E2E35]">
+                  <button
+                    type="button"
+                    onClick={() => setModalEsqueciSenha(false)}
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-lg bg-[#27272A] hover:bg-[#3F3F46] text-xs font-bold text-white transition-colors cursor-pointer"
+                  >
+                    Voltar
+                  </button>
+                  <a
+                    href={`https://wa.me/5547998812233?text=${encodeURIComponent(
+                      `Olá Pastores da Eira Church! Esqueci minha senha de acesso ao Painel da Liderança.\nMeu usuário/nome é: ${recuperarUser.trim() || 'Não especificado'}.\nPoderiam por favor redefinir minha senha de acesso?`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full sm:flex-1 py-2.5 px-4 rounded-lg bg-[var(--accent,#FACC15)] text-black font-extrabold text-xs flex items-center justify-center space-x-1.5 hover:opacity-90 transition-opacity"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    <span>Solicitar aos Pastores no WhatsApp</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Orientações Oficiais de Acesso */}
           <div className="p-3.5 rounded-lg bg-[#1D1D23] border border-[#2E2E35] text-[11px] text-[#A1A1AA] space-y-1.5">

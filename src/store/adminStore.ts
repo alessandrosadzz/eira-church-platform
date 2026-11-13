@@ -16,6 +16,7 @@ import {
 } from '../types/igreja';
 import {
   atualizarFuncaoLiderSupabase,
+  atualizarSenhaUsuarioSupabase,
   buscarCelulasSupabase,
 } from '../lib/eventoAdapter';
 
@@ -168,6 +169,7 @@ interface AdminStore {
     novoUsuario?: string;
     novaSenha?: string;
   }) => Promise<void>;
+  alterarSenhaUsuario: (nomeOuUsuario: string, novaSenha: string) => Promise<boolean>;
 
   // Notificações & Relatório de Atividades dos Líderes (Para Pastores e Admins)
   atividadesLideres: AtividadeLider[];
@@ -735,6 +737,38 @@ export const useAdminStore = create<AdminStore>((set, get) => ({
     } catch (err) {
       console.warn('Erro ao sincronizar função no Supabase:', err);
     }
+  },
+
+  alterarSenhaUsuario: async (nomeOuUsuario, novaSenha) => {
+    const termo = nomeOuUsuario.trim().toLowerCase();
+    const lideresAtuais = [...get().lideres];
+    let alterado = false;
+
+    const novaLista = lideresAtuais.map((l) => {
+      if (
+        l.nome.trim().toLowerCase() === termo ||
+        l.usuarioOuEmail.trim().toLowerCase() === termo
+      ) {
+        alterado = true;
+        return { ...l, senha: novaSenha };
+      }
+      return l;
+    });
+
+    if (alterado) {
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('eira_lideres', JSON.stringify(novaLista));
+        } catch {}
+      }
+      set({ lideres: novaLista });
+    }
+
+    try {
+      await atualizarSenhaUsuarioSupabase(nomeOuUsuario, novaSenha);
+    } catch {}
+
+    return true;
   },
 
   atividadesLideres: obterListaArmazenada<AtividadeLider>('eira_atividades_lideres', []),

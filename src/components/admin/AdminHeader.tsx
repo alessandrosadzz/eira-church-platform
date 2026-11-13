@@ -5,6 +5,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useAdminStore, AbaAdmin, UsuarioRole } from '../../store/adminStore';
 import { Button } from '../ui/Button';
+import { useToast } from '../../hooks/useToast';
 import {
   LogOut,
   Calendar,
@@ -22,6 +23,12 @@ import {
   Sparkles,
   ExternalLink,
   RefreshCw,
+  Key,
+  Eye,
+  EyeOff,
+  X,
+  Lock,
+  ChevronDown,
 } from 'lucide-react';
 
 export interface AdminHeaderProps {
@@ -37,10 +44,12 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
   onAtualizar,
   carregando = false,
 }) => {
+  const { sucesso, erro } = useToast();
   const {
     abaAtiva,
     setAbaAtiva,
     usuarioRole,
+    usuarioNomeLogado,
     setUsuarioRole,
     igrejaConfig,
     modoCor,
@@ -49,23 +58,55 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
     celulas,
     atividadesLideres,
     marcarAtividadesLideresLidas,
+    alterarSenhaUsuario,
   } = useAdminStore();
 
   const [menuNotificacoesAberto, setMenuNotificacoesAberto] = useState(false);
+  const [menuPerfilAberto, setMenuPerfilAberto] = useState(false);
+  const [modalMinhaSenhaAberto, setModalMinhaSenhaAberto] = useState(false);
+  const [novaMinhaSenha, setNovaMinhaSenha] = useState('');
+  const [mostrarMinhaSenha, setMostrarMinhaSenha] = useState(false);
+  const [salvandoMinhaSenha, setSalvandoMinhaSenha] = useState(false);
+
   const [abaNotifAtiva, setAbaNotifAtiva] = useState<'todas' | 'lideres'>('todas');
   const [notificacoesLidas, setNotificacoesLidas] = useState<string[]>([]);
   const notifRef = useRef<HTMLDivElement>(null);
+  const perfilRef = useRef<HTMLDivElement>(null);
 
-  // Fecha menu de notificações ao clicar fora
+  // Fecha menus ao clicar fora
   useEffect(() => {
     const handleClickFora = (e: MouseEvent) => {
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
         setMenuNotificacoesAberto(false);
       }
+      if (perfilRef.current && !perfilRef.current.contains(e.target as Node)) {
+        setMenuPerfilAberto(false);
+      }
     };
     document.addEventListener('mousedown', handleClickFora);
     return () => document.removeEventListener('mousedown', handleClickFora);
   }, []);
+
+  const handleSalvarMinhaSenha = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!novaMinhaSenha.trim() || novaMinhaSenha.length < 4) {
+      erro('A senha deve ter no mínimo 4 caracteres.');
+      return;
+    }
+
+    setSalvandoMinhaSenha(true);
+    try {
+      await alterarSenhaUsuario(usuarioNomeLogado || 'pastores', novaMinhaSenha.trim());
+      sucesso('Sua senha foi alterada com sucesso!');
+      setModalMinhaSenhaAberto(false);
+      setNovaMinhaSenha('');
+      setMenuPerfilAberto(false);
+    } catch {
+      erro('Não foi possível alterar sua senha.');
+    } finally {
+      setSalvandoMinhaSenha(false);
+    }
+  };
 
   const nomeExibicao = igrejaNome || igrejaConfig.nome || 'Eira Church';
 
@@ -197,50 +238,50 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
   return (
     <header className="w-full bg-white border-b border-[#E4E4E7] sticky top-0 z-40 transition-colors">
       {/* Barra Superior da Marca e Operador */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-[var(--radius-btn,0.5rem)] bg-[#0A0A0A] text-[var(--accent,#FACC15)] flex items-center justify-center font-black text-lg border border-black shadow-sm overflow-hidden">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
+        <div className="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-[var(--radius-btn,0.5rem)] bg-[#0A0A0A] text-[var(--accent,#FACC15)] flex items-center justify-center font-black text-sm sm:text-base border border-black shadow-sm overflow-hidden shrink-0">
             {igrejaConfig?.logoUrl ? (
               <img
                 src={igrejaConfig.logoUrl}
                 alt={nomeExibicao}
-                className="w-full h-full object-contain p-1"
+                className="w-full h-full object-contain p-0.5 sm:p-1"
               />
             ) : (
               nomeExibicao.charAt(0)
             )}
           </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="font-extrabold text-base tracking-tight text-[#0A0A0A]">
+          <div className="min-w-0">
+            <div className="flex items-center space-x-1.5">
+              <span className="font-extrabold text-sm sm:text-base tracking-tight text-[#0A0A0A] truncate">
                 {nomeExibicao}
               </span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-[#F4F4F5] text-[#52525B] border border-[#E4E4E7]">
+              <span className="hidden md:inline-flex px-2 py-0.5 rounded text-[10px] font-black uppercase bg-[#F4F4F5] text-[#52525B] border border-[#E4E4E7]">
                 Painel Liderança
               </span>
             </div>
-            <p className="text-[11px] text-[#71717A]">
+            <p className="text-[11px] text-[#71717A] hidden sm:block truncate">
               Gestão de Eventos, Células e Visitantes
             </p>
           </div>
         </div>
 
-        {/* Controles de Lado Direito: Notificações, Atualizar Supabase, Perfil Ativo, Dark Mode, Tema e Logout */}
-        <div className="flex items-center space-x-2 sm:space-x-3">
+        {/* Controles de Lado Direito: Notificações, Atualizar Supabase, Perfil Interativo */}
+        <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
           {/* Botão de Sincronizar / Atualizar Supabase */}
           {onAtualizar && (
             <button
               type="button"
               onClick={onAtualizar}
               disabled={carregando}
-              className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-[#F4F4F5] border border-[#E4E4E7] text-[#0A0A0A] hover:border-black transition-colors cursor-pointer text-xs font-bold ${
+              className={`flex items-center space-x-1.5 p-2 sm:px-2.5 sm:py-1.5 rounded-lg bg-[#F4F4F5] border border-[#E4E4E7] text-[#0A0A0A] hover:border-black transition-colors cursor-pointer text-xs font-bold min-h-[38px] ${
                 carregando ? 'opacity-60 cursor-not-allowed' : ''
               }`}
               title="Atualizar dados em tempo real com o Supabase"
               aria-label="Atualizar dados do Supabase"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${carregando ? 'animate-spin text-black' : 'text-[#52525B]'}`} />
-              <span className="hidden sm:inline">Atualizar</span>
+              <RefreshCw className={`w-4 h-4 sm:w-3.5 sm:h-3.5 ${carregando ? 'animate-spin text-black' : 'text-[#52525B]'}`} />
+              <span className="hidden md:inline">Atualizar</span>
             </button>
           )}
 
@@ -249,7 +290,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
             <button
               type="button"
               onClick={() => setMenuNotificacoesAberto(!menuNotificacoesAberto)}
-              className="relative p-2 rounded-lg bg-[#F4F4F5] border border-[#E4E4E7] text-[#0A0A0A] hover:border-black transition-colors cursor-pointer"
+              className="relative p-2 rounded-lg bg-[#F4F4F5] border border-[#E4E4E7] text-[#0A0A0A] hover:border-black transition-colors cursor-pointer min-h-[38px] min-w-[38px] flex items-center justify-center"
               title="Notificações e Atualizações dos Líderes"
               aria-label="Abrir notificações"
             >
@@ -261,7 +302,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
 
             {/* Menu Dropdown de Notificações */}
             {menuNotificacoesAberto && (
-              <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-[var(--radius-box,0.75rem)] border border-[#E4E4E7] shadow-xl z-50 overflow-hidden text-left animate-fadeIn">
+              <div className="absolute right-0 mt-2 w-72 sm:w-96 bg-white rounded-[var(--radius-box,0.75rem)] border border-[#E4E4E7] shadow-xl z-50 overflow-hidden text-left animate-fadeIn">
                 <div className="p-3.5 border-b border-[#F4F4F5] flex items-center justify-between bg-[#FAFAFA]">
                   <div className="flex items-center space-x-2">
                     <Bell className="w-4 h-4 text-black" />
@@ -296,7 +337,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                           : 'text-[#71717A] hover:text-black'
                       }`}
                     >
-                      Todas as Notificações
+                      Todas
                     </button>
                     <button
                       type="button"
@@ -307,7 +348,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                           : 'text-[#71717A] hover:text-black'
                       }`}
                     >
-                      <span>Relatório Líderes</span>
+                      <span>Líderes</span>
                       {contagemLideresNaoLidas > 0 && (
                         <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent,#FACC15)]" />
                       )}
@@ -351,50 +392,172 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
             )}
           </div>
 
-          {/* Badge do Papel Autenticado */}
-          <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-[#F4F4F5] border border-[#E4E4E7]">
-            <UserCheck className="w-3.5 h-3.5 text-[#71717A]" />
-            <span className="text-xs font-extrabold text-[#0A0A0A] capitalize">
-              {usuarioRole === 'pastor'
-                ? 'Perfil: Pastor'
-                : usuarioRole === 'admin'
-                ? 'Perfil: ADM'
-                : usuarioRole === 'lider_12'
-                ? 'Perfil: Líder de Rede (12)'
-                : usuarioRole === 'conexao'
-                ? 'Perfil: Equipe Conexão'
-                : 'Perfil: Líder de Célula'}
-            </span>
-          </div>
-
-          {/* Alternador de Modo Claro / Modo Escuro */}
-          <button
-            type="button"
-            onClick={() => setModoCor(modoCor === 'dark' ? 'light' : 'dark')}
-            title={`Alternar para ${modoCor === 'dark' ? 'Modo Claro' : 'Modo Escuro'}`}
-            className="p-2 rounded-lg bg-[#F4F4F5] border border-[#E4E4E7] text-[#0A0A0A] hover:border-black transition-colors cursor-pointer"
-            aria-label="Alternar tema claro e escuro"
-          >
-            {modoCor === 'dark' ? (
-              <Sun className="w-4 h-4 text-[var(--accent,#FACC15)]" />
-            ) : (
-              <Moon className="w-4 h-4 text-[#52525B]" />
-            )}
-          </button>
-
-          {onLogout && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onLogout}
-              aria-label="Sair do painel administrativo"
+          {/* Menu Interativo de Perfil & Alteração de Senha */}
+          <div className="relative" ref={perfilRef}>
+            <button
+              type="button"
+              onClick={() => setMenuPerfilAberto(!menuPerfilAberto)}
+              className="flex items-center space-x-1 sm:space-x-1.5 px-2.5 py-1.5 rounded-lg bg-[#F4F4F5] border border-[#E4E4E7] hover:border-black transition-colors cursor-pointer min-h-[38px]"
+              title="Meu Perfil e Opções da Conta"
+              aria-label="Abrir menu de perfil"
             >
-              <LogOut className="w-4 h-4 mr-1.5" aria-hidden="true" />
-              <span className="hidden sm:inline">Sair</span>
-            </Button>
-          )}
+              <UserCheck className="w-4 h-4 text-[#0A0A0A]" />
+              <span className="text-xs font-extrabold text-[#0A0A0A] capitalize">
+                {usuarioRole === 'pastor'
+                  ? 'Pastor'
+                  : usuarioRole === 'admin'
+                  ? 'ADM'
+                  : usuarioRole === 'lider_12'
+                  ? 'Rede 12'
+                  : usuarioRole === 'conexao'
+                  ? 'Conexão'
+                  : 'Célula'}
+              </span>
+              <ChevronDown className={`w-3 h-3 text-[#71717A] transition-transform ${menuPerfilAberto ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Dropdown do Perfil */}
+            {menuPerfilAberto && (
+              <div className="absolute right-0 mt-2 w-64 bg-white rounded-[var(--radius-box,0.75rem)] border border-[#E4E4E7] shadow-xl z-50 overflow-hidden text-left animate-fadeIn divide-y divide-[#F4F4F5]">
+                <div className="p-3 bg-[#FAFAFA]">
+                  <p className="text-[10px] font-bold uppercase text-[#71717A]">
+                    Operador Conectado
+                  </p>
+                  <p className="text-xs font-black text-[#0A0A0A] truncate mt-0.5">
+                    {usuarioNomeLogado || 'Liderança Eira'}
+                  </p>
+                  <p className="text-[11px] text-[#52525B]">
+                    Função: {usuarioRole === 'pastor' ? 'Pastor da Igreja' : usuarioRole === 'admin' ? 'Administrador Geral' : usuarioRole === 'lider_12' ? 'Líder de Rede (12)' : usuarioRole === 'conexao' ? 'Equipe Conexão' : 'Líder de Célula'}
+                  </p>
+                </div>
+
+                <div className="p-1.5 space-y-1">
+                  {/* Botão Mudar Minha Senha */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuPerfilAberto(false);
+                      setNovaMinhaSenha('');
+                      setMostrarMinhaSenha(false);
+                      setModalMinhaSenhaAberto(true);
+                    }}
+                    className="w-full flex items-center space-x-2 px-3 py-2 text-xs font-bold text-[#0A0A0A] hover:bg-[#F4F4F5] rounded-md transition-colors cursor-pointer"
+                  >
+                    <Key className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Alterar Minha Senha</span>
+                  </button>
+
+                  {/* Alternar Tema */}
+                  <button
+                    type="button"
+                    onClick={() => setModoCor(modoCor === 'dark' ? 'light' : 'dark')}
+                    className="w-full flex items-center space-x-2 px-3 py-2 text-xs font-bold text-[#0A0A0A] hover:bg-[#F4F4F5] rounded-md transition-colors cursor-pointer"
+                  >
+                    {modoCor === 'dark' ? (
+                      <Sun className="w-3.5 h-3.5 text-[var(--accent,#FACC15)]" />
+                    ) : (
+                      <Moon className="w-3.5 h-3.5 text-[#52525B]" />
+                    )}
+                    <span>{modoCor === 'dark' ? 'Ativar Modo Claro' : 'Ativar Modo Escuro'}</span>
+                  </button>
+                </div>
+
+                {onLogout && (
+                  <div className="p-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuPerfilAberto(false);
+                        onLogout();
+                      }}
+                      className="w-full flex items-center space-x-2 px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Sair do Painel</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Modal Alterar Minha Senha */}
+      {modalMinhaSenhaAberto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fadeIn">
+          <div className="w-full max-w-sm bg-white rounded-[var(--radius-box,0.75rem)] border border-[#E4E4E7] shadow-2xl p-6 space-y-4 text-left">
+            <div className="flex items-center justify-between border-b border-[#F4F4F5] pb-3">
+              <div className="flex items-center space-x-2">
+                <div className="p-2 rounded-lg bg-blue-100 text-blue-800">
+                  <Key className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-[#0A0A0A]">
+                    Alterar Minha Senha
+                  </h3>
+                  <p className="text-xs text-[#71717A]">
+                    {usuarioNomeLogado || 'Minha Conta'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalMinhaSenhaAberto(false)}
+                className="p-1.5 rounded-lg text-[#71717A] hover:text-[#0A0A0A] hover:bg-[#F4F4F5] transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSalvarMinhaSenha} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-tight text-[#0A0A0A] mb-1.5">
+                  Digite sua Nova Senha
+                </label>
+                <div className="relative">
+                  <input
+                    type={mostrarMinhaSenha ? 'text' : 'password'}
+                    required
+                    value={novaMinhaSenha}
+                    onChange={(e) => setNovaMinhaSenha(e.target.value)}
+                    placeholder="Mínimo 4 caracteres"
+                    className="w-full h-11 pl-3.5 pr-10 rounded-lg bg-white border border-[#E4E4E7] text-sm text-[#0A0A0A] placeholder-[#71717A] focus:outline-none focus:ring-2 focus:ring-black"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMostrarMinhaSenha(!mostrarMinhaSenha)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717A] hover:text-[#0A0A0A] p-1 cursor-pointer"
+                    aria-label={mostrarMinhaSenha ? 'Ocultar senha' : 'Ver senha'}
+                  >
+                    {mostrarMinhaSenha ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-[#F4F4F5]">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="md"
+                  onClick={() => setModalMinhaSenhaAberto(false)}
+                  disabled={salvandoMinhaSenha}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="md"
+                  disabled={salvandoMinhaSenha}
+                >
+                  {salvandoMinhaSenha ? 'Salvando...' : 'Salvar Nova Senha'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Navegação de Abas com Espaçamento Amigável no Mobile */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 flex overflow-x-auto no-scrollbar border-t border-[#F4F4F5]">
@@ -406,7 +569,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
               <button
                 key={item.id}
                 onClick={() => setAbaAtiva(item.id)}
-                className={`flex items-center space-x-2 px-3.5 py-2 text-xs font-bold rounded-[var(--radius-btn,0.5rem)] transition-colors whitespace-nowrap cursor-pointer shrink-0 ${
+                className={`flex items-center space-x-2 px-3.5 py-2 text-xs font-bold rounded-[var(--radius-btn,0.5rem)] transition-colors whitespace-nowrap cursor-pointer shrink-0 min-h-[38px] ${
                   isAtiva
                     ? 'bg-[#0A0A0A] text-white shadow-sm'
                     : 'text-[#71717A] hover:text-[#0A0A0A] hover:bg-[#F4F4F5]'

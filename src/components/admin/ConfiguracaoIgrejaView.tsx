@@ -46,6 +46,9 @@ import {
   Lock,
   CheckCircle2,
   Home,
+  Eye,
+  EyeOff,
+  Copy,
 } from 'lucide-react';
 import {
   buscarInscricoesSupabase,
@@ -97,6 +100,7 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
     setVisitantes,
     lideres,
     atualizarFuncaoPessoa,
+    alterarSenhaUsuario,
     atualizarStatusVisitante,
   } = useAdminStore();
 
@@ -123,6 +127,41 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
   const [novaRedeSelecionada, setNovaRedeSelecionada] = useState('Hype');
   const [novoNomeCelula, setNovoNomeCelula] = useState('');
   const [salvandoFuncao, setSalvandoFuncao] = useState(false);
+
+  // Estados do Modal de Alteração de Senha
+  const [modalSenhaAberto, setModalSenhaAberto] = useState(false);
+  const [pessoaSenha, setPessoaSenha] = useState<PessoaCenso | null>(null);
+  const [novaSenhaInput, setNovaSenhaInput] = useState('eira@1212');
+  const [mostrarSenhaModal, setMostrarSenhaModal] = useState(false);
+  const [salvandoSenha, setSalvandoSenha] = useState(false);
+
+  const handleAbrirModalSenha = (p: PessoaCenso) => {
+    setPessoaSenha(p);
+    setNovaSenhaInput('eira@1212');
+    setMostrarSenhaModal(false);
+    setModalSenhaAberto(true);
+  };
+
+  const handleSalvarNovaSenha = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pessoaSenha) return;
+    if (!novaSenhaInput.trim() || novaSenhaInput.length < 4) {
+      erro('A senha deve ter no mínimo 4 caracteres.');
+      return;
+    }
+
+    setSalvandoSenha(true);
+    try {
+      await alterarSenhaUsuario(pessoaSenha.usuarioLogin || pessoaSenha.nome, novaSenhaInput.trim());
+      sucesso(`Senha de ${pessoaSenha.nome} atualizada com sucesso!`);
+      setModalSenhaAberto(false);
+      setPessoaSenha(null);
+    } catch {
+      erro('Não foi possível salvar a nova senha.');
+    } finally {
+      setSalvandoSenha(false);
+    }
+  };
 
   const carregarInscricoes = async () => {
     setCarregandoInscricoes(true);
@@ -326,6 +365,34 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
     inscricoes.forEach((insc) => {
       if (nomesLideresVistos.has(insc.nome.toLowerCase().trim())) return;
 
+      const contaLider = lideres.find(
+        (l) =>
+          l.nome.toLowerCase().trim() === insc.nome.toLowerCase().trim() ||
+          (insc.email && l.usuarioOuEmail.toLowerCase().trim() === insc.email.toLowerCase().trim())
+      );
+      const roleInsc = ((insc as any).role as UsuarioRole) || contaLider?.role;
+      const isConexaoInsc =
+        roleInsc === 'conexao' ||
+        insc.rede_participante === 'Conexão' ||
+        contaLider?.role === 'conexao';
+
+      if (isConexaoInsc) {
+        lista.push({
+          id: `insc-conexao-${insc.id}`,
+          nome: insc.nome,
+          telefone: insc.telefone || null,
+          email: insc.email || null,
+          categoria: 'conexao',
+          subRole: 'conexao',
+          categoriaLabel: '🤝 Equipe Conexão',
+          origem: 'Equipe Conexão // Acolhimento & Visitantes',
+          detalhes: `Usuário: ${(insc as any).usuario || contaLider?.usuarioOuEmail || insc.email?.split('@')[0] || 'conexao'}`,
+          badgeCor: 'bg-sky-100 text-sky-950 border-sky-300 font-extrabold',
+          rede: 'Conexão',
+        });
+        return;
+      }
+
       const isMenor = (insc.idade && insc.idade < 18) || (insc.rede_participante === 'Hype');
       lista.push({
         id: `insc-${insc.id}`,
@@ -352,8 +419,8 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
         nomeResponsavel: insc.nome_responsavel || null,
         idade: insc.idade || null,
         badgeCor: isMenor
-          ? 'bg-amber-100 text-amber-900 border-amber-300'
-          : 'bg-purple-100 text-purple-900 border-purple-300',
+          ? 'bg-amber-100 text-amber-950 border-amber-300'
+          : 'bg-purple-100 text-purple-950 border-purple-300',
       });
     });
 
@@ -1160,6 +1227,17 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
                             <MessageCircle className="w-3.5 h-3.5" />
                           </a>
                         )}
+
+                        {/* Botão de Alterar Senha Rápido */}
+                        <button
+                          type="button"
+                          onClick={() => handleAbrirModalSenha(p)}
+                          className="px-2.5 py-1.5 rounded-lg border border-[#E4E4E7] bg-white hover:bg-[#F4F4F5] text-xs font-bold text-[#0A0A0A] flex items-center space-x-1.5 transition-all cursor-pointer shadow-2xs"
+                          title={`Alterar senha de acesso de ${p.nome}`}
+                        >
+                          <Key className="w-3.5 h-3.5 text-blue-600" />
+                          <span className="hidden sm:inline">Mudar Senha</span>
+                        </button>
 
                         {/* Botão de Alterar Função (Exclusivo Pastores e Admins) */}
                         <button
@@ -2071,6 +2149,125 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
                       <span>Salvar Nova Função</span>
                     </>
                   )}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* MODAL DEDICADO DE ALTERAÇÃO DE SENHA */}
+      {/* ==================================================== */}
+      {modalSenhaAberto && pessoaSenha && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fadeIn">
+          <div className="w-full max-w-md bg-white rounded-[var(--radius-box,0.75rem)] border border-[#E4E4E7] shadow-2xl p-6 space-y-4 text-left">
+            <div className="flex items-center justify-between border-b border-[#F4F4F5] pb-3">
+              <div className="flex items-center space-x-2">
+                <div className="p-2 rounded-lg bg-blue-100 text-blue-800">
+                  <Key className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-[#0A0A0A]">
+                    Alterar Senha de Acesso
+                  </h3>
+                  <p className="text-xs text-[#71717A]">
+                    {pessoaSenha.nome} ({pessoaSenha.categoriaLabel})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setModalSenhaAberto(false);
+                  setPessoaSenha(null);
+                }}
+                className="p-1.5 rounded-lg text-[#71717A] hover:text-[#0A0A0A] hover:bg-[#F4F4F5] transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSalvarNovaSenha} className="space-y-4">
+              <div className="p-3 rounded-lg bg-[#FAFAFA] border border-[#E4E4E7] text-xs space-y-1">
+                <p className="text-[#52525B]">
+                  <strong>Usuário de Login:</strong>{' '}
+                  <code className="bg-white px-1.5 py-0.5 rounded border border-[#E4E4E7] font-mono text-[#0A0A0A] font-bold">
+                    {pessoaSenha.usuarioLogin ||
+                      pessoaSenha.email?.split('@')[0] ||
+                      pessoaSenha.nome.toLowerCase().replace(/\s+/g, '.')}
+                  </code>
+                </p>
+                <p className="text-[11px] text-[#71717A]">
+                  Este é o identificador que a pessoa digita na tela de login.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-tight text-[#0A0A0A] mb-1.5">
+                  Nova Senha de Acesso
+                </label>
+                <div className="relative">
+                  <input
+                    type={mostrarSenhaModal ? 'text' : 'password'}
+                    required
+                    value={novaSenhaInput}
+                    onChange={(e) => setNovaSenhaInput(e.target.value)}
+                    placeholder="Mínimo 4 caracteres"
+                    className="w-full h-11 pl-3.5 pr-10 rounded-lg bg-white border border-[#E4E4E7] text-sm text-[#0A0A0A] placeholder-[#71717A] focus:outline-none focus:ring-2 focus:ring-black"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMostrarSenhaModal(!mostrarSenhaModal)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717A] hover:text-[#0A0A0A] p-1 cursor-pointer"
+                    aria-label={mostrarSenhaModal ? 'Ocultar senha' : 'Ver senha'}
+                  >
+                    {mostrarSenhaModal ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Botões de Predefinição Rápida */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#71717A]">
+                  Sugestões Rápidas:
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {['eira@1212', 'eira@2026', 'igreja12', 'jesus10'].map((sug) => (
+                    <button
+                      key={sug}
+                      type="button"
+                      onClick={() => setNovaSenhaInput(sug)}
+                      className="px-2 py-1 rounded bg-[#F4F4F5] hover:bg-[#E4E4E7] text-[11px] font-bold text-[#0A0A0A] transition-colors cursor-pointer"
+                    >
+                      {sug}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Ações do Modal */}
+              <div className="flex items-center justify-end space-x-2 pt-3 border-t border-[#F4F4F5]">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="md"
+                  onClick={() => {
+                    setModalSenhaAberto(false);
+                    setPessoaSenha(null);
+                  }}
+                  disabled={salvandoSenha}
+                >
+                  Cancelar
+                </Button>
+
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="md"
+                  disabled={salvandoSenha}
+                >
+                  {salvandoSenha ? 'Salvando...' : 'Salvar Nova Senha'}
                 </Button>
               </div>
             </form>
