@@ -2,7 +2,7 @@
 
 // src/components/admin/ConfiguracaoIgrejaView.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAdminStore, TemaWhiteLabel, BordaPerfil, FonteOpcao } from '../../store/adminStore';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
@@ -24,7 +24,20 @@ import {
   Sun,
   Moon,
   X,
+  Users,
+  UserCheck,
+  Crown,
+  HeartHandshake,
+  Ticket,
+  Search,
+  Filter,
+  RefreshCw,
+  ChevronDown,
+  ChevronUp,
+  MessageCircle,
 } from 'lucide-react';
+import { buscarInscricoesSupabase, carregarInscricoesLocal } from '../../lib/eventoAdapter';
+import { Inscricao } from '../../types/inscricao';
 
 export const ConfiguracaoIgrejaView: React.FC = () => {
   const { sucesso, erro, info } = useToast();
@@ -41,7 +54,193 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
     setFonteAtiva,
     modoCor,
     setModoCor,
+    celulas,
+    visitantes,
+    lideres,
   } = useAdminStore();
+
+  // Estados do Censo de Pessoas Cadastradas
+  const [inscricoes, setInscricoes] = useState<Inscricao[]>([]);
+  const [carregandoInscricoes, setCarregandoInscricoes] = useState(false);
+  const [filtroTipoPessoa, setFiltroTipoPessoa] = useState<
+    'todos' | 'lider' | 'membro' | 'visitante' | 'inscrito'
+  >('todos');
+  const [buscaPessoas, setBuscaPessoas] = useState('');
+  const [expandirListaPessoas, setExpandirListaPessoas] = useState(true);
+  const [limiteExibicao, setLimiteExibicao] = useState(25);
+
+  const carregarInscricoes = async () => {
+    setCarregandoInscricoes(true);
+    try {
+      const data = await buscarInscricoesSupabase();
+      if (data && data.length > 0) {
+        setInscricoes(data);
+      } else {
+        setInscricoes(carregarInscricoesLocal());
+      }
+    } catch {
+      setInscricoes(carregarInscricoesLocal());
+    } finally {
+      setCarregandoInscricoes(false);
+    }
+  };
+
+  useEffect(() => {
+    carregarInscricoes();
+  }, []);
+
+  // Lista consolidada de todas as pessoas da igreja
+  const listaConsolidada = useMemo(() => {
+    const lista: {
+      id: string;
+      nome: string;
+      telefone?: string | null;
+      email?: string | null;
+      categoria: 'lider' | 'membro' | 'visitante' | 'inscrito';
+      categoriaLabel: string;
+      origem: string;
+      detalhes: string;
+      badgeCor: string;
+    }[] = [];
+
+    const nomesLideresVistos = new Set<string>();
+
+    // 1. Líderes de Célula (do cadastro de células)
+    celulas.forEach((cel) => {
+      if (cel.lider_nome && !nomesLideresVistos.has(cel.lider_nome.toLowerCase().trim())) {
+        nomesLideresVistos.add(cel.lider_nome.toLowerCase().trim());
+        lista.push({
+          id: `cel-lid-${cel.id}`,
+          nome: cel.lider_nome,
+          telefone: cel.lider_telefone || null,
+          categoria: 'lider',
+          categoriaLabel: 'Líder de Célula',
+          origem: `Célula ${cel.nome} (${cel.rede || 'Geral'})`,
+          detalhes: `${cel.dia_semana || 'Semana'} às ${cel.horario || '19h30'} • ${cel.bairro || 'Joinville'}`,
+          badgeCor: 'bg-amber-100 text-amber-900 border-amber-300',
+        });
+      }
+    });
+
+    // 1b. Líderes de contas registradas
+    lideres.forEach((lid) => {
+      if (lid.nome && !nomesLideresVistos.has(lid.nome.toLowerCase().trim())) {
+        nomesLideresVistos.add(lid.nome.toLowerCase().trim());
+        lista.push({
+          id: `lid-conta-${lid.id}`,
+          nome: lid.nome,
+          telefone: lid.telefone || null,
+          email: lid.usuarioOuEmail || null,
+          categoria: 'lider',
+          categoriaLabel: 'Líder Cadastrado',
+          origem: lid.celulaNome
+            ? `Célula ${lid.celulaNome} (${lid.rede || 'Geral'})`
+            : lid.rede
+            ? `Rede ${lid.rede}`
+            : 'Liderança Eira Church',
+          detalhes: `Usuário: ${lid.usuarioOuEmail}`,
+          badgeCor: 'bg-amber-100 text-amber-900 border-amber-300',
+        });
+      }
+    });
+
+    // 2. Membros de Células
+    celulas.forEach((cel) => {
+      (cel.membros || []).forEach((m) => {
+        lista.push({
+          id: `membro-${cel.id}-${m.id}`,
+          nome: m.nome,
+          telefone: m.telefone || null,
+          categoria: 'membro',
+          categoriaLabel: m.funcao || 'Membro',
+          origem: `Célula ${cel.nome}`,
+          detalhes: `${m.batizado ? '💧 Batizado' : 'Não batizado'} • ${m.tempo_celula || 'Membro ativo'}`,
+          badgeCor: 'bg-blue-100 text-blue-900 border-blue-300',
+        });
+      });
+    });
+
+    // 3. Visitantes (Conexão / Boas-Vindas)
+    visitantes.forEach((vis) => {
+      lista.push({
+        id: `vis-${vis.id}`,
+        nome: vis.nome,
+        telefone: vis.telefone || null,
+        categoria: 'visitante',
+        categoriaLabel: 'Visitante (Conexão)',
+        origem: vis.culto_origem || 'Culto da Igreja',
+        detalhes: `Convidado por: ${vis.quem_convidou || 'Espontâneo'} • Status: ${
+          vis.status === 'integrado'
+            ? 'Integrado à Célula'
+            : vis.status === 'em_contato'
+            ? 'Em Acompanhamento'
+            : 'Novo Visitante'
+        }`,
+        badgeCor: 'bg-emerald-100 text-emerald-900 border-emerald-300',
+      });
+    });
+
+    // 4. Inscritos em Eventos
+    inscricoes.forEach((insc) => {
+      lista.push({
+        id: `insc-${insc.id}`,
+        nome: insc.nome,
+        telefone: insc.telefone || null,
+        email: insc.email || null,
+        categoria: 'inscrito',
+        categoriaLabel: 'Inscrito em Evento',
+        origem: insc.evento?.nome || 'Evento Eira Church',
+        detalhes: `Código: ${insc.comprovante_hash || 'EIRA'} • ${
+          insc.status === 'pago'
+            ? 'Confirmado / Pago'
+            : insc.status === 'isento'
+            ? 'Isento'
+            : 'Pré-Inscrição (Pendente)'
+        }`,
+        badgeCor: 'bg-purple-100 text-purple-900 border-purple-300',
+      });
+    });
+
+    return lista;
+  }, [celulas, lideres, visitantes, inscricoes]);
+
+  // Contadores por Categoria
+  const totalLideres = useMemo(
+    () => listaConsolidada.filter((p) => p.categoria === 'lider').length,
+    [listaConsolidada]
+  );
+  const totalMembros = useMemo(
+    () => listaConsolidada.filter((p) => p.categoria === 'membro').length,
+    [listaConsolidada]
+  );
+  const totalVisitantes = useMemo(
+    () => listaConsolidada.filter((p) => p.categoria === 'visitante').length,
+    [listaConsolidada]
+  );
+  const totalInscritos = useMemo(
+    () => listaConsolidada.filter((p) => p.categoria === 'inscrito').length,
+    [listaConsolidada]
+  );
+  const totalGeral = listaConsolidada.length;
+
+  // Filtragem e Busca
+  const pessoasFiltradas = useMemo(() => {
+    return listaConsolidada.filter((p) => {
+      if (filtroTipoPessoa !== 'todos' && p.categoria !== filtroTipoPessoa) {
+        return false;
+      }
+      if (buscaPessoas.trim()) {
+        const termo = buscaPessoas.toLowerCase();
+        const bateNome = p.nome.toLowerCase().includes(termo);
+        const bateTel = p.telefone ? p.telefone.includes(termo) : false;
+        const bateEmail = p.email ? p.email.toLowerCase().includes(termo) : false;
+        const bateOrigem = p.origem.toLowerCase().includes(termo);
+        const bateDetalhes = p.detalhes.toLowerCase().includes(termo);
+        return bateNome || bateTel || bateEmail || bateOrigem || bateDetalhes;
+      }
+      return true;
+    });
+  }, [listaConsolidada, filtroTipoPessoa, buscaPessoas]);
 
   // Estados locais do formulário de dados da igreja
   const [nome, setNome] = useState(igrejaConfig.nome);
@@ -248,6 +447,327 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
           <Save className="w-4 h-4 mr-2" />
           <span>Salvar Alterações</span>
         </Button>
+      </div>
+
+      {/* ==================================================== */}
+      {/* SEÇÃO NOBRE: CENSO DA IGREJA & TOTAL DE PESSOAS CADASTRADAS */}
+      {/* ==================================================== */}
+      <div className="p-6 rounded-[var(--radius-box,0.75rem)] bg-white border border-[#E4E4E7] shadow-sm space-y-6">
+        {/* Cabeçalho do Censo com Total Geral em Destaque */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#F4F4F5] pb-4">
+          <div className="flex items-start space-x-3">
+            <span className="p-2.5 rounded-xl bg-black text-[var(--accent,#FACC15)] flex-shrink-0 mt-0.5 shadow-xs">
+              <Users className="w-5 h-5" />
+            </span>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-extrabold text-lg text-[#0A0A0A]">
+                  Total de Pessoas Cadastradas na Igreja
+                </h3>
+                <span className="px-3 py-0.5 rounded-full text-xs font-black bg-[var(--accent,#FACC15)] text-[var(--accent-text,#000000)] shadow-xs">
+                  {totalGeral} {totalGeral === 1 ? 'pessoa' : 'pessoas no total'}
+                </span>
+              </div>
+              <p className="text-xs text-[#71717A] mt-1">
+                Censo geral unificado: líderes de célula, membros, visitantes da acolhida e inscritos em eventos da igreja com filtro por perfil.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2 flex-shrink-0">
+            <button
+              type="button"
+              onClick={carregarInscricoes}
+              disabled={carregandoInscricoes}
+              className="px-3 py-1.5 rounded-lg border border-[#E4E4E7] bg-white hover:bg-[#FAFAFA] text-xs font-bold text-[#0A0A0A] flex items-center space-x-1.5 transition-colors cursor-pointer"
+              title="Atualizar dados do censo"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${carregandoInscricoes ? 'animate-spin' : ''}`} />
+              <span>Atualizar</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setExpandirListaPessoas(!expandirListaPessoas)}
+              className="px-3 py-1.5 rounded-lg border border-[#E4E4E7] bg-white hover:bg-[#FAFAFA] text-xs font-bold text-[#0A0A0A] flex items-center space-x-1.5 transition-colors cursor-pointer"
+            >
+              {expandirListaPessoas ? (
+                <>
+                  <span>Recolher</span>
+                  <ChevronUp className="w-3.5 h-3.5" />
+                </>
+              ) : (
+                <>
+                  <span>Ver Pessoas</span>
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* 4 Cards de Métricas por Categoria (Clicáveis para filtrar) */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Card Líderes */}
+          <button
+            type="button"
+            onClick={() => setFiltroTipoPessoa('lider')}
+            className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+              filtroTipoPessoa === 'lider'
+                ? 'border-amber-500 bg-amber-50/70 ring-2 ring-amber-500 shadow-sm'
+                : 'border-[#E4E4E7] hover:border-[#0A0A0A] bg-white'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-extrabold text-amber-950 flex items-center gap-1.5">
+                <Crown className="w-4 h-4 text-amber-600" />
+                Líderes & Pastores
+              </span>
+              <span className="text-xl font-black text-[#0A0A0A]">{totalLideres}</span>
+            </div>
+            <p className="text-[11px] text-[#71717A] mt-1.5">
+              {totalLideres === 1 ? '1 líder cadastrado' : `${totalLideres} líderes ativos`}
+            </p>
+          </button>
+
+          {/* Card Membros */}
+          <button
+            type="button"
+            onClick={() => setFiltroTipoPessoa('membro')}
+            className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+              filtroTipoPessoa === 'membro'
+                ? 'border-blue-500 bg-blue-50/70 ring-2 ring-blue-500 shadow-sm'
+                : 'border-[#E4E4E7] hover:border-[#0A0A0A] bg-white'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-extrabold text-blue-950 flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-blue-600" />
+                Membros de Células
+              </span>
+              <span className="text-xl font-black text-[#0A0A0A]">{totalMembros}</span>
+            </div>
+            <p className="text-[11px] text-[#71717A] mt-1.5">
+              {totalMembros === 1 ? '1 membro de célula' : `${totalMembros} membros registrados`}
+            </p>
+          </button>
+
+          {/* Card Visitantes */}
+          <button
+            type="button"
+            onClick={() => setFiltroTipoPessoa('visitante')}
+            className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+              filtroTipoPessoa === 'visitante'
+                ? 'border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-500 shadow-sm'
+                : 'border-[#E4E4E7] hover:border-[#0A0A0A] bg-white'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-extrabold text-emerald-950 flex items-center gap-1.5">
+                <HeartHandshake className="w-4 h-4 text-emerald-600" />
+                Visitantes (Conexão)
+              </span>
+              <span className="text-xl font-black text-[#0A0A0A]">{totalVisitantes}</span>
+            </div>
+            <p className="text-[11px] text-[#71717A] mt-1.5">
+              {totalVisitantes === 1 ? '1 novo visitante' : `${totalVisitantes} pessoas acolhidas`}
+            </p>
+          </button>
+
+          {/* Card Inscritos em Eventos */}
+          <button
+            type="button"
+            onClick={() => setFiltroTipoPessoa('inscrito')}
+            className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+              filtroTipoPessoa === 'inscrito'
+                ? 'border-purple-500 bg-purple-50/70 ring-2 ring-purple-500 shadow-sm'
+                : 'border-[#E4E4E7] hover:border-[#0A0A0A] bg-white'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-extrabold text-purple-950 flex items-center gap-1.5">
+                <Ticket className="w-4 h-4 text-purple-600" />
+                Inscritos em Eventos
+              </span>
+              <span className="text-xl font-black text-[#0A0A0A]">{totalInscritos}</span>
+            </div>
+            <p className="text-[11px] text-[#71717A] mt-1.5">
+              {totalInscritos === 1 ? '1 participante' : `${totalInscritos} inscrições / pré-cadastros`}
+            </p>
+          </button>
+        </div>
+
+        {/* Barra de Filtros, Busca e Tabela */}
+        {expandirListaPessoas && (
+          <div className="space-y-4 pt-2">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              {/* Tabs de Filtro de Categoria */}
+              <div className="flex flex-wrap gap-1.5 bg-[#F4F4F5] p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setFiltroTipoPessoa('todos')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    filtroTipoPessoa === 'todos'
+                      ? 'bg-black text-white shadow-xs'
+                      : 'text-[#52525B] hover:text-[#0A0A0A]'
+                  }`}
+                >
+                  Todas ({totalGeral})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFiltroTipoPessoa('lider')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    filtroTipoPessoa === 'lider'
+                      ? 'bg-amber-600 text-white shadow-xs'
+                      : 'text-[#52525B] hover:text-[#0A0A0A]'
+                  }`}
+                >
+                  👑 Líderes ({totalLideres})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFiltroTipoPessoa('membro')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    filtroTipoPessoa === 'membro'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-[#52525B] hover:text-[#0A0A0A]'
+                  }`}
+                >
+                  👥 Membros ({totalMembros})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFiltroTipoPessoa('visitante')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    filtroTipoPessoa === 'visitante'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'text-[#52525B] hover:text-[#0A0A0A]'
+                  }`}
+                >
+                  🤝 Visitantes ({totalVisitantes})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFiltroTipoPessoa('inscrito')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    filtroTipoPessoa === 'inscrito'
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'text-[#52525B] hover:text-[#0A0A0A]'
+                  }`}
+                >
+                  🎟️ Inscritos ({totalInscritos})
+                </button>
+              </div>
+
+              {/* Input de Busca */}
+              <div className="relative min-w-[240px] flex-1 max-w-md">
+                <Search className="w-4 h-4 text-[#A1A1AA] absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={buscaPessoas}
+                  onChange={(e) => setBuscaPessoas(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') e.preventDefault();
+                  }}
+                  placeholder="Buscar por nome, telefone, célula..."
+                  className="w-full h-9 pl-9 pr-8 rounded-lg border border-[#E4E4E7] bg-white text-xs text-[#0A0A0A] placeholder-[#A1A1AA] focus:border-black focus:outline-none"
+                />
+                {buscaPessoas && (
+                  <button
+                    type="button"
+                    onClick={() => setBuscaPessoas('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#A1A1AA] hover:text-[#0A0A0A] text-xs cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Listagem / Tabela de Pessoas */}
+            <div className="border border-[#E4E4E7] rounded-xl overflow-hidden bg-white shadow-xs">
+              {pessoasFiltradas.length === 0 ? (
+                <div className="p-8 text-center text-[#71717A] space-y-2">
+                  <Users className="w-8 h-8 mx-auto text-[#A1A1AA] opacity-40" />
+                  <p className="text-sm font-bold text-[#0A0A0A]">Nenhuma pessoa encontrada</p>
+                  <p className="text-xs">
+                    {buscaPessoas
+                      ? 'Nenhum resultado corresponde aos termos da pesquisa.'
+                      : 'Não há registros nesta categoria no momento.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-[#F4F4F5] max-h-[460px] overflow-y-auto">
+                  {pessoasFiltradas.slice(0, limiteExibicao).map((p) => {
+                    const numeroLimpo = p.telefone ? p.telefone.replace(/\D/g, '') : '';
+                    const linkWhatsApp = numeroLimpo
+                      ? `https://wa.me/55${numeroLimpo}`
+                      : null;
+
+                    return (
+                      <div
+                        key={p.id}
+                        className="p-3.5 hover:bg-[#FAFAFA] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition-colors"
+                      >
+                        <div className="flex items-center space-x-3 min-w-0">
+                          <div className="w-9 h-9 rounded-full bg-[#F4F4F5] border border-[#E4E4E7] flex items-center justify-center font-extrabold text-xs text-[#0A0A0A] flex-shrink-0">
+                            {p.nome.substring(0, 2).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-extrabold text-[#0A0A0A] truncate">
+                                {p.nome}
+                              </span>
+                              <span
+                                className={`px-2 py-0.5 rounded-full border text-[10px] font-bold ${p.badgeCor}`}
+                              >
+                                {p.categoriaLabel}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-[#71717A] truncate mt-0.5">
+                              {p.origem} • <span className="text-[#52525B]">{p.detalhes}</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-2 flex-shrink-0 self-end sm:self-center">
+                          {p.telefone && (
+                            <span className="text-[#52525B] font-mono text-[11px]">
+                              {p.telefone}
+                            </span>
+                          )}
+                          {linkWhatsApp && (
+                            <a
+                              href={linkWhatsApp}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 rounded-lg border border-[#E4E4E7] bg-white hover:bg-[#DCFCE7] hover:border-[#86EFAC] text-[#166534] transition-colors"
+                              title="Conversar no WhatsApp"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {pessoasFiltradas.length > limiteExibicao && (
+                <div className="p-3 bg-[#FAFAFA] border-t border-[#E4E4E7] text-center">
+                  <button
+                    type="button"
+                    onClick={() => setLimiteExibicao((prev) => prev + 30)}
+                    className="text-xs font-bold text-[#0A0A0A] hover:underline cursor-pointer"
+                  >
+                    Exibindo {limiteExibicao} de {pessoasFiltradas.length} pessoas • Carregar mais...
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ==================================================== */}
