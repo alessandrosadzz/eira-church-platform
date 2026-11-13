@@ -150,11 +150,22 @@ export const ConexaoView: React.FC = () => {
       return;
     }
 
+    const cidadeIgreja =
+      igrejaConfig?.endereco?.cidade?.trim() ||
+      (igrejaConfig?.cidadePix ? `${igrejaConfig.cidadePix} - SC` : '') ||
+      'Joinville - SC';
+
+    const localizacaoTexto = [novoBairro.trim(), cidadeIgreja].filter(Boolean).join(', ');
+    const mapsUrl = novoBairro.trim()
+      ? `https://maps.google.com/?q=${encodeURIComponent(localizacaoTexto)}`
+      : undefined;
+
     const novoObj: Omit<VisitanteConexao, 'id'> = {
       nome: novoNome.trim(),
       sexo: novoSexo,
       telefone: novoTelefone.trim(),
       bairro: novoBairro.trim() || 'Não informado',
+      maps_url: mapsUrl,
       quem_convidou: novoQuemConvidou.trim() || 'Culto de Domingo',
       faixa_etaria: novaFaixaEtaria,
       ja_participa_celula: novoJaParticipaCelula,
@@ -204,11 +215,22 @@ export const ConexaoView: React.FC = () => {
       return;
     }
 
+    const cidadeIgreja =
+      igrejaConfig?.endereco?.cidade?.trim() ||
+      (igrejaConfig?.cidadePix ? `${igrejaConfig.cidadePix} - SC` : '') ||
+      'Joinville - SC';
+
+    const localizacaoTexto = [editBairro.trim(), cidadeIgreja].filter(Boolean).join(', ');
+    const mapsUrl = editBairro.trim()
+      ? `https://maps.google.com/?q=${encodeURIComponent(localizacaoTexto)}`
+      : undefined;
+
     const dadosAtualizados: Partial<VisitanteConexao> = {
       nome: editNome.trim(),
       sexo: editSexo,
       telefone: editTelefone.trim(),
       bairro: editBairro.trim() || 'Não informado',
+      maps_url: mapsUrl,
       quem_convidou: editQuemConvidou.trim() || 'Culto de Domingo',
       faixa_etaria: editFaixaEtaria,
       ja_participa_celula: editJaParticipaCelula,
@@ -465,11 +487,34 @@ export const ConexaoView: React.FC = () => {
                       <h4 className="font-extrabold text-base text-[#0A0A0A]">
                         {v.nome}
                       </h4>
-                      <p className="text-xs text-[#71717A] flex items-center gap-1 mt-0.5">
-                        <MapPin className="w-3.5 h-3.5 text-[#A1A1AA]" />
+                      <p className="text-xs text-[#71717A] flex items-center flex-wrap gap-1 mt-0.5">
+                        <MapPin className="w-3.5 h-3.5 text-[#A1A1AA] flex-shrink-0" />
                         <span>Bairro {v.bairro}</span>
                         <span>•</span>
                         <span>{v.faixa_etaria}</span>
+                        {v.bairro && v.bairro !== 'Não informado' && (
+                          <a
+                            href={
+                              v.maps_url ||
+                              `https://maps.google.com/?q=${encodeURIComponent(
+                                [
+                                  v.bairro,
+                                  igrejaConfig?.endereco?.cidade ||
+                                    (igrejaConfig?.cidadePix ? `${igrejaConfig.cidadePix} - SC` : '') ||
+                                    'Joinville - SC',
+                                ]
+                                  .filter(Boolean)
+                                  .join(', ')
+                              )}`
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center text-[10px] font-bold text-sky-700 hover:text-sky-900 ml-1 hover:underline bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200"
+                            title="Ver localização no Google Maps"
+                          >
+                            <span>Maps ↗</span>
+                          </a>
+                        )}
                       </p>
                     </div>
 
@@ -635,7 +680,7 @@ export const ConexaoView: React.FC = () => {
                 type="tel"
                 value={novoTelefone}
                 onChange={(e) => setNovoTelefone(e.target.value)}
-                placeholder="(45) 99881-2233"
+                placeholder="(47) 99881-2233"
               />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -643,7 +688,7 @@ export const ConexaoView: React.FC = () => {
                   label="Bairro onde mora"
                   value={novoBairro}
                   onChange={(e) => setNovoBairro(e.target.value)}
-                  placeholder="Ex: Coqueiral / Cascavel"
+                  placeholder="Ex: América, Glória, Centro..."
                 />
 
                 <Input

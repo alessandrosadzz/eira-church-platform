@@ -43,12 +43,27 @@ export default function BoasVindasPage() {
 
   const [enviadoComSucesso, setEnviadoComSucesso] = useState(false);
 
-  // Link do Google Maps gerado em tempo real
+  // Cidade e Estado configurados na Igreja (ex: Joinville - SC)
+  const cidadeIgreja = useMemo(() => {
+    return (
+      igrejaConfig?.endereco?.cidade?.trim() ||
+      (igrejaConfig?.cidadePix ? `${igrejaConfig.cidadePix} - SC` : '') ||
+      'Joinville - SC'
+    );
+  }, [igrejaConfig]);
+
+  // Link do Google Maps gerado em tempo real com endereço/bairro do visitante + cidade da igreja
   const mapsLink = useMemo(() => {
     const local = endereco.trim() || bairro.trim();
     if (!local) return '';
-    return `https://maps.google.com/?q=${encodeURIComponent(`${local}, Cascavel - PR`)}`;
-  }, [endereco, bairro]);
+
+    const partes: string[] = [];
+    if (endereco.trim()) partes.push(endereco.trim());
+    if (bairro.trim()) partes.push(bairro.trim());
+    if (cidadeIgreja) partes.push(cidadeIgreja);
+
+    return `https://maps.google.com/?q=${encodeURIComponent(partes.join(', '))}`;
+  }, [endereco, bairro, cidadeIgreja]);
 
   // Célula mais próxima identificada por bairro
   const celulaProxima = useMemo(() => {
@@ -283,7 +298,7 @@ export default function BoasVindasPage() {
             type="tel"
             value={telefone}
             onChange={(e) => setTelefone(e.target.value)}
-            placeholder="(45) 99881-2233"
+            placeholder="(47) 99881-2233"
             helperText="Usaremos para te enviar uma mensagem de boas-vindas."
           />
 
@@ -292,32 +307,37 @@ export default function BoasVindasPage() {
               label="Bairro onde você mora"
               value={bairro}
               onChange={(e) => setBairro(e.target.value)}
-              placeholder="Ex: Coqueiral, Centro, Neva..."
+              placeholder="Ex: América, Glória, Centro, Costa e Silva..."
             />
 
             <Input
               label="Endereço ou Ponto de Referência"
               value={endereco}
               onChange={(e) => setEndereco(e.target.value)}
-              placeholder="Ex: Rua Paraná, 1500"
+              placeholder="Ex: Rua Dr. João Colin, 1200"
             />
           </div>
 
           {/* Link Automático Google Maps e Proximidade de Célula */}
           {mapsLink && (
-            <div className="p-3 rounded-lg bg-[#FAFAFA] border border-[#E4E4E7] flex items-center justify-between text-xs">
+            <div className="p-3.5 rounded-lg bg-[#FAFAFA] border border-[#E4E4E7] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
               <div className="flex items-center space-x-2 text-[#52525B]">
-                <MapPin className="w-4 h-4 text-rose-500" />
-                <span>Localização: <strong>{bairro || endereco}</strong></span>
+                <MapPin className="w-4 h-4 text-rose-500 flex-shrink-0" />
+                <span className="leading-tight">
+                  Localização:{' '}
+                  <strong className="text-[#0A0A0A]">
+                    {[endereco.trim(), bairro.trim(), cidadeIgreja].filter(Boolean).join(', ')}
+                  </strong>
+                </span>
               </div>
               <a
                 href={mapsLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center space-x-1 text-black font-extrabold hover:underline"
+                className="inline-flex items-center space-x-1.5 text-black font-extrabold hover:underline flex-shrink-0 bg-white px-2.5 py-1.5 rounded-md border border-[#E4E4E7] shadow-2xs hover:bg-[#F4F4F5] transition-colors"
               >
                 <span>Abrir no Google Maps</span>
-                <ExternalLink className="w-3 h-3" />
+                <ExternalLink className="w-3.5 h-3.5" />
               </a>
             </div>
           )}

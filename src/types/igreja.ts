@@ -99,6 +99,7 @@ export interface Celula {
   bairro: string;
   endereco: string;
   maps_url: string;
+  role?: UsuarioRole | 'membro';
   membros: CelulaMembro[];
 }
 

@@ -60,7 +60,7 @@ export interface PessoaCenso {
   nome: string;
   telefone?: string | null;
   email?: string | null;
-  categoria: 'lider' | 'membro' | 'visitante' | 'inscrito';
+  categoria: 'lider' | 'conexao' | 'membro' | 'visitante' | 'inscrito';
   subRole: UsuarioRole | 'membro' | 'visitante' | 'inscrito';
   categoriaLabel: string;
   origem: string;
@@ -167,38 +167,53 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
         (l) => l.nome.trim().toLowerCase() === cel.lider_nome.trim().toLowerCase()
       );
       const roleEfetivo: UsuarioRole =
-        lidConta?.role || (meta.role as UsuarioRole) || 'lider_celula';
+        lidConta?.role || (meta.role as UsuarioRole) || (cel.role as UsuarioRole) || 'lider_celula';
 
       if (cel.lider_nome && !nomesLideresVistos.has(cel.lider_nome.toLowerCase().trim())) {
         nomesLideresVistos.add(cel.lider_nome.toLowerCase().trim());
         const is12 = roleEfetivo === 'lider_12';
         const isPastor = roleEfetivo === 'pastor';
         const isAdmin = roleEfetivo === 'admin';
+        const isConexao =
+          roleEfetivo === 'conexao' ||
+          lidConta?.role === 'conexao' ||
+          (meta.role as string) === 'conexao' ||
+          (cel.role as string) === 'conexao' ||
+          cel.nome?.toLowerCase().trim() === 'célula conexão' ||
+          cel.nome?.toLowerCase().trim() === 'conexão';
 
         lista.push({
           id: `cel-lid-${cel.id}`,
           nome: cel.lider_nome,
           telefone: cel.lider_telefone || null,
-          categoria: 'lider',
-          subRole: roleEfetivo,
+          categoria: isConexao ? 'conexao' : 'lider',
+          subRole: isConexao ? 'conexao' : roleEfetivo,
           categoriaLabel: is12
             ? '👑 Líder de 12 (Rede)'
             : isPastor
             ? '✝️ Pastor'
             : isAdmin
             ? '🛡️ Administrador'
+            : isConexao
+            ? '🤝 Equipe Conexão'
             : '🏠 Líder de Célula',
-          origem: `Célula ${cel.nome} (${cel.rede || 'Geral'})`,
-          detalhes: `${cel.dia_semana || 'Semana'} às ${cel.horario || '19h30'} • ${cel.bairro || 'Joinville'}`,
+          origem: isConexao
+            ? 'Equipe Conexão // Acolhimento & Visitantes'
+            : `Célula ${cel.nome} (${cel.rede || 'Geral'})`,
+          detalhes: isConexao
+            ? `Usuário: ${lidConta?.usuarioOuEmail || 'conexao'}`
+            : `${cel.dia_semana || 'Semana'} às ${cel.horario || '19h30'} • ${cel.bairro || 'Joinville'}`,
           badgeCor: is12
             ? 'bg-amber-100 text-amber-950 border-amber-300 font-extrabold'
             : isPastor
             ? 'bg-purple-100 text-purple-950 border-purple-300 font-extrabold'
             : isAdmin
             ? 'bg-zinc-100 text-zinc-950 border-zinc-300 font-extrabold'
+            : isConexao
+            ? 'bg-sky-100 text-sky-950 border-sky-300 font-extrabold'
             : 'bg-amber-50 text-amber-900 border-amber-200',
-          celulaId: cel.id,
-          celulaNome: cel.nome,
+          celulaId: isConexao ? undefined : cel.id,
+          celulaNome: isConexao ? undefined : cel.nome,
           rede: cel.rede,
           usuarioLogin: lidConta?.usuarioOuEmail || meta.usuario || undefined,
         });
@@ -213,35 +228,49 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
         const is12 = roleEfetivo === 'lider_12';
         const isPastor = roleEfetivo === 'pastor';
         const isAdmin = roleEfetivo === 'admin';
+        const isConexao =
+          roleEfetivo === 'conexao' ||
+          lid.role === 'conexao' ||
+          lid.celulaNome === 'Célula Conexão' ||
+          lid.celulaNome === 'Conexão' ||
+          (lid.rede === 'Conexão' && roleEfetivo !== 'pastor' && roleEfetivo !== 'admin');
 
         lista.push({
           id: `lid-conta-${lid.id}`,
           nome: lid.nome,
           telefone: lid.telefone || null,
           email: lid.usuarioOuEmail || null,
-          categoria: 'lider',
-          subRole: roleEfetivo,
+          categoria: isConexao ? 'conexao' : 'lider',
+          subRole: isConexao ? 'conexao' : roleEfetivo,
           categoriaLabel: is12
             ? '👑 Líder de 12 (Rede)'
             : isPastor
             ? '✝️ Pastor'
             : isAdmin
             ? '🛡️ Administrador'
+            : isConexao
+            ? '🤝 Equipe Conexão'
             : '🏠 Líder de Célula',
-          origem: lid.celulaNome
+          origem: isConexao
+            ? 'Equipe Conexão // Acolhimento & Visitantes'
+            : lid.celulaNome
             ? `Célula ${lid.celulaNome} (${lid.rede || 'Geral'})`
             : lid.rede
             ? `Rede ${lid.rede}`
             : 'Liderança Eira Church',
-          detalhes: `Usuário: ${lid.usuarioOuEmail}`,
+          detalhes: isConexao
+            ? `Usuário: ${lid.usuarioOuEmail}`
+            : `Usuário: ${lid.usuarioOuEmail}`,
           badgeCor: is12
             ? 'bg-amber-100 text-amber-950 border-amber-300 font-extrabold'
             : isPastor
             ? 'bg-purple-100 text-purple-950 border-purple-300 font-extrabold'
             : isAdmin
             ? 'bg-zinc-100 text-zinc-950 border-zinc-300 font-extrabold'
+            : isConexao
+            ? 'bg-sky-100 text-sky-950 border-sky-300 font-extrabold'
             : 'bg-amber-50 text-amber-900 border-amber-200',
-          celulaNome: lid.celulaNome,
+          celulaNome: isConexao ? undefined : lid.celulaNome,
           rede: lid.rede,
           usuarioLogin: lid.usuarioOuEmail,
         });
@@ -425,8 +454,8 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
         email: pessoaSelecionada.email,
         novaFuncao: novaFuncaoSelecionada,
         celulaId: pessoaSelecionada.celulaId,
-        rede: novaRedeSelecionada,
-        celulaNome: novoNomeCelula,
+        rede: novaFuncaoSelecionada === 'conexao' ? 'Conexão' : novaRedeSelecionada,
+        celulaNome: novaFuncaoSelecionada === 'lider_celula' ? novoNomeCelula.trim() : undefined,
         novoUsuario: novoUsuarioAcesso,
         novaSenha: novaSenhaAcesso,
       });
@@ -810,7 +839,7 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
           </div>
 
           {/* Cards de Métricas por Categoria (Clicáveis para filtrar) */}
-          <div className="grid grid-cols-2 lg:grid-cols-6 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5">
             {/* Card Líderes de 12 */}
             <button
               type="button"
@@ -863,6 +892,24 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
               </div>
               <p className="text-xs font-bold text-purple-950 mt-1 truncate">Pastores & ADM</p>
               <p className="text-[10px] text-[#71717A]">Diretoria</p>
+            </button>
+
+            {/* Card Equipe Conexão */}
+            <button
+              type="button"
+              onClick={() => setFiltroTipoPessoa(filtroTipoPessoa === 'conexao' ? 'todos' : 'conexao')}
+              className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                filtroTipoPessoa === 'conexao'
+                  ? 'border-sky-500 bg-sky-50 ring-2 ring-sky-500 shadow-sm'
+                  : 'border-[#E4E4E7] hover:border-black bg-white'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <HeartHandshake className="w-4 h-4 text-sky-600" />
+                <span className="text-lg font-black text-[#0A0A0A]">{totalConexao}</span>
+              </div>
+              <p className="text-xs font-bold text-sky-950 mt-1 truncate">Equipe Conexão</p>
+              <p className="text-[10px] text-[#71717A]">Acolhimento</p>
             </button>
 
             {/* Card Membros */}
@@ -1945,24 +1992,36 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
                       required
                     />
 
-                    <div>
-                      <label className="block text-[11px] font-bold uppercase tracking-tight text-[#0A0A0A] mb-1">
-                        Rede Ministerial
-                      </label>
-                      <select
-                        value={novaRedeSelecionada}
-                        onChange={(e) => setNovaRedeSelecionada(e.target.value)}
-                        className="w-full h-11 px-3 rounded-lg bg-white border border-[#E4E4E7] text-xs text-[#0A0A0A]"
-                      >
-                        <option value="Hype">Rede Hype (Teens / 12-17)</option>
-                        <option value="One Way">Rede One Way (Jovens & Universitários)</option>
-                        <option value="Homens">Rede de Homens</option>
-                        <option value="Mulheres">Rede de Mulheres</option>
-                        <option value="Casais">Rede de Casais</option>
-                        <option value="Família">Rede da Família</option>
-                        <option value="Geral">Rede Geral</option>
-                      </select>
-                    </div>
+                    {novaFuncaoSelecionada === 'conexao' ? (
+                      <div className="sm:col-span-2 p-3 rounded-lg bg-sky-50 border border-sky-200 text-xs text-sky-900 flex items-start space-x-2">
+                        <HeartHandshake className="w-4 h-4 text-sky-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-bold">Acesso Exclusivo à Recepção & Conexão</p>
+                          <p className="text-[11px] text-sky-800">
+                            Esta pessoa terá acesso restrito ao módulo de visitantes e acolhimento do culto. Não gerenciará células nem eventos.
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="block text-[11px] font-bold uppercase tracking-tight text-[#0A0A0A] mb-1">
+                          Rede Ministerial
+                        </label>
+                        <select
+                          value={novaRedeSelecionada}
+                          onChange={(e) => setNovaRedeSelecionada(e.target.value)}
+                          className="w-full h-11 px-3 rounded-lg bg-white border border-[#E4E4E7] text-xs text-[#0A0A0A]"
+                        >
+                          <option value="Hype">Rede Hype (Teens / 12-17)</option>
+                          <option value="One Way">Rede One Way (Jovens & Universitários)</option>
+                          <option value="Homens">Rede de Homens</option>
+                          <option value="Mulheres">Rede de Mulheres</option>
+                          <option value="Casais">Rede de Casais</option>
+                          <option value="Família">Rede da Família</option>
+                          <option value="Geral">Rede Geral</option>
+                        </select>
+                      </div>
+                    )}
 
                     {novaFuncaoSelecionada === 'lider_celula' && (
                       <div>

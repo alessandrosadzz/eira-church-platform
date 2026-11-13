@@ -61,11 +61,11 @@ const IGREJA_CONFIG_PADRAO: IgrejaConfig = {
   bannerUrl: '',
   faviconUrl: '',
   endereco: {
-    logradouro: '',
-    bairro: '',
-    cidade: '',
-    cep: '',
-    mapsUrl: '',
+    logradouro: 'Rua Anita Garibaldi, 850',
+    bairro: 'Anita Garibaldi',
+    cidade: 'Joinville - SC',
+    cep: '89203-300',
+    mapsUrl: 'https://maps.google.com/?q=Joinville+-+SC',
   },
   cultos: [],
   telefone: '',
@@ -684,14 +684,25 @@ export const useAdminStore = create<AdminStore>((set, get) => ({
               .replace(/[^a-z0-9]+/g, '.'));
       const senhaValida = dados.novaSenha || (idx >= 0 ? lideresAtuais[idx].senha : 'eira@1212');
 
+      const isConexao = dados.novaFuncao === 'conexao';
+      const celulaNomeValido = isConexao
+        ? ''
+        : dados.novaFuncao === 'lider_celula'
+        ? (dados.celulaNome || (idx >= 0 ? lideresAtuais[idx].celulaNome : 'Célula'))
+        : (dados.celulaNome || (idx >= 0 ? lideresAtuais[idx].celulaNome : ''));
+
+      const redeValida = isConexao
+        ? 'Conexão'
+        : (dados.rede || (idx >= 0 ? lideresAtuais[idx].rede : 'Geral'));
+
       const conta: LiderConta = {
         id: idx >= 0 ? lideresAtuais[idx].id : `lid-${Date.now()}`,
         nome: nomeLimpo,
         usuarioOuEmail: usuarioValido,
         senha: senhaValida,
         telefone: dados.telefone || (idx >= 0 ? lideresAtuais[idx].telefone : ''),
-        celulaNome: dados.celulaNome || (idx >= 0 ? lideresAtuais[idx].celulaNome : 'Célula Eira'),
-        rede: dados.rede || (idx >= 0 ? lideresAtuais[idx].rede : 'Geral'),
+        celulaNome: celulaNomeValido,
+        rede: redeValida,
         role: dados.novaFuncao as UsuarioRole,
         criadoEm: idx >= 0 ? lideresAtuais[idx].criadoEm : new Date().toISOString(),
       };

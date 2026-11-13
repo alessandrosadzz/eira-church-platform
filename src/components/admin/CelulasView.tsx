@@ -50,6 +50,7 @@ export const CelulasView: React.FC = () => {
     toggleBatismoMembro,
     usuarioRole,
     usuarioNomeLogado,
+    igrejaConfig,
   } = useAdminStore();
 
   const isLiderCelula = usuarioRole === 'lider_celula' || usuarioRole === 'lider';
@@ -233,9 +234,13 @@ export const CelulasView: React.FC = () => {
       return;
     }
 
-    const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(
-      `${novoEndereco || novoBairro}, Joinville - SC`
-    )}`;
+    const cidadeIgreja =
+      igrejaConfig?.endereco?.cidade?.trim() ||
+      (igrejaConfig?.cidadePix ? `${igrejaConfig.cidadePix} - SC` : '') ||
+      'Joinville - SC';
+
+    const localizacaoTexto = [novoEndereco || novoBairro, cidadeIgreja].filter(Boolean).join(', ');
+    const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(localizacaoTexto)}`;
 
     const celulaCriada = await salvarCelulaSupabase({
       nome: novaNome.trim(),
@@ -247,7 +252,7 @@ export const CelulasView: React.FC = () => {
       dia_semana: novoDia,
       horario: novoHorario,
       bairro: novoBairro.trim() || 'Centro',
-      endereco: novoEndereco.trim() || `${novoBairro}, Joinville - SC`,
+      endereco: novoEndereco.trim() || localizacaoTexto,
       maps_url: mapsUrl,
       membros: [
         {
@@ -834,7 +839,7 @@ export const CelulasView: React.FC = () => {
                   required
                   value={novoBairro}
                   onChange={(e) => setNovoBairro(e.target.value)}
-                  placeholder="Ex: Coqueiral"
+                  placeholder="Ex: América, Glória, Centro..."
                 />
               </div>
 
@@ -852,7 +857,7 @@ export const CelulasView: React.FC = () => {
                   required
                   value={novoLiderTel}
                   onChange={(e) => setNovoLiderTel(e.target.value)}
-                  placeholder="(45) 99881-2233"
+                  placeholder="(47) 99881-2233"
                 />
               </div>
 
@@ -876,7 +881,7 @@ export const CelulasView: React.FC = () => {
                 label="Endereço Completo para rota no Google Maps"
                 value={novoEndereco}
                 onChange={(e) => setNovoEndereco(e.target.value)}
-                placeholder="Ex: Rua Flamboyant, 450 - Coqueiral, Cascavel - PR"
+                placeholder="Ex: Rua Dr. João Colin, 1234 - América"
               />
 
               <div className="pt-3 border-t border-[#E4E4E7] flex items-center justify-end space-x-2">

@@ -74,9 +74,13 @@ export default function CadastroLiderCelulaPage() {
       return;
     }
 
-    const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(
-      `${endereco || bairro}, Joinville - SC`
-    )}`;
+    const cidadeIgreja =
+      igrejaConfig?.endereco?.cidade?.trim() ||
+      (igrejaConfig?.cidadePix ? `${igrejaConfig.cidadePix} - SC` : '') ||
+      'Joinville - SC';
+
+    const localizacaoTexto = [endereco.trim() || bairro.trim(), cidadeIgreja].filter(Boolean).join(', ');
+    const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(localizacaoTexto)}`;
 
     const nomeGrupoFinal = nomeCelula.trim();
 
@@ -93,7 +97,7 @@ export default function CadastroLiderCelulaPage() {
         dia_semana: diaSemana,
         horario,
         bairro: bairro.trim() || 'Centro',
-        endereco: endereco.trim() || `${bairro}, Joinville - SC`,
+        endereco: endereco.trim() || localizacaoTexto,
         maps_url: mapsUrl,
         usuarioAcesso: usuarioAcesso.trim(),
         senhaAcesso: senhaAcesso.trim(),
