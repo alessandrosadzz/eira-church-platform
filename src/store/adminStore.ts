@@ -14,6 +14,10 @@ import {
   CelulaMembro,
   LiderConta,
 } from '../types/igreja';
+import {
+  atualizarFuncaoLiderSupabase,
+  buscarCelulasSupabase,
+} from '../lib/eventoAdapter';
 
 export type AbaAdmin =
   | 'dashboard'
@@ -151,6 +155,19 @@ interface AdminStore {
   removerMembroCelula: (celulaId: string, membroId: string) => void;
   toggleBatismoMembro: (celulaId: string, membroId: string) => void;
 
+  // Gestão e Alteração de Funções (Pastores e Admins)
+  atualizarFuncaoPessoa: (dados: {
+    pessoaNome: string;
+    telefone?: string | null;
+    email?: string | null;
+    novaFuncao: UsuarioRole | 'membro';
+    celulaId?: string;
+    rede?: string;
+    celulaNome?: string;
+    novoUsuario?: string;
+    novaSenha?: string;
+  }) => Promise<void>;
+
   // Notificações & Relatório de Atividades dos Líderes (Para Pastores e Admins)
   atividadesLideres: AtividadeLider[];
   registrarAtividadeLider: (
@@ -208,7 +225,7 @@ const obterConfigArmazenada = (padrao: IgrejaConfig): IgrejaConfig => {
   }
 };
 
-export const useAdminStore = create<AdminStore>((set) => ({
+export const useAdminStore = create<AdminStore>((set, get) => ({
   abaAtiva: 'dashboard',
   setAbaAtiva: (aba) => set({ abaAtiva: aba }),
 
@@ -584,6 +601,94 @@ export const useAdminStore = create<AdminStore>((set) => ({
       }
       return { celulas: novaLista };
     }),
+
+  atualizarFuncaoPessoa: async (dados) => {
+    const nomeLimpo = dados.pessoaNome.trim();
+    const nomeLower = nomeLimpo.toLowerCase();
+    const roleNome =
+      dados.novaFuncao === 'lider_12'
+        ? 'Líder de 12 (Rede)'
+        : dados.novaFuncao === 'lider_celula'
+        ? 'Líder de Célula'
+        : dados.novaFuncao === 'pastor'
+        ? 'Pastor da Igreja'
+        : dados.novaFuncao === 'admin'
+        ? 'Administrador Geral'
+        : 'Membro';
+
+    const usuarioLogado = get().usuarioNomeLogado || 'Pastores Eira Church';
+
+    // Registra atividade para notificação
+    const novaAtividade: AtividadeLider = {
+      id: `atv-funcao-${Date.now()}`,
+      tipo: 'celula_atualizada',
+      liderNome: usuarioLogado,
+      titulo: 'Função Ministerial Atualizada',
+      descricao: `${nomeLimpo} foi atualizado(a) para a função ${roleNome}.`,
+      detalhe: `Atualizado por ${usuarioLogado} em ${new Date().toLocaleDateString('pt-BR')}`,
+      timestamp: new Date().toISOString(),
+      lida: false,
+    };
+
+    // Atualiza contas de líderes no estado
+    const lideresAtuais = [...get().lideres];
+    const idx = lideresAtuais.findIndex((l) => l.nome.trim().toLowerCase() === nomeLower);
+
+    let novaListaLideres = lideresAtuais;
+    if (dados.novaFuncao === 'membro') {
+      novaListaLideres = lideresAtuais.filter((l) => l.nome.trim().toLowerCase() !== nomeLower);
+    } else {
+      const usuarioValido =
+        dados.novoUsuario ||
+        (idx >= 0
+          ? lideresAtuais[idx].usuarioOuEmail
+          : nomeLower
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .replace(/[^a-z0-9]+/g, '.'));
+      const senhaValida = dados.novaSenha || (idx >= 0 ? lideresAtuais[idx].senha : 'eira@1212');
+
+      const conta: LiderConta = {
+        id: idx >= 0 ? lideresAtuais[idx].id : `lid-${Date.now()}`,
+        nome: nomeLimpo,
+        usuarioOuEmail: usuarioValido,
+        senha: senhaValida,
+        telefone: dados.telefone || (idx >= 0 ? lideresAtuais[idx].telefone : ''),
+        celulaNome: dados.celulaNome || (idx >= 0 ? lideresAtuais[idx].celulaNome : 'Célula Eira'),
+        rede: dados.rede || (idx >= 0 ? lideresAtuais[idx].rede : 'Geral'),
+        role: dados.novaFuncao as UsuarioRole,
+        criadoEm: idx >= 0 ? lideresAtuais[idx].criadoEm : new Date().toISOString(),
+      };
+
+      if (idx >= 0) {
+        novaListaLideres[idx] = conta;
+      } else {
+        novaListaLideres = [conta, ...lideresAtuais];
+      }
+    }
+
+    const novasAtividades = [novaAtividade, ...get().atividadesLideres].slice(0, 50);
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('eira_lideres', JSON.stringify(novaListaLideres));
+        localStorage.setItem('eira_atividades_lideres', JSON.stringify(novasAtividades));
+      } catch {}
+    }
+
+    set({ lideres: novaListaLideres, atividadesLideres: novasAtividades });
+
+    // Sincroniza com Supabase via adapter
+    try {
+      await atualizarFuncaoLiderSupabase(dados);
+      const celulasAtualizadas = await buscarCelulasSupabase();
+      if (celulasAtualizadas && celulasAtualizadas.length > 0) {
+        set({ celulas: celulasAtualizadas });
+      }
+    } catch (err) {
+      console.warn('Erro ao sincronizar função no Supabase:', err);
+    }
+  },
 
   atividadesLideres: obterListaArmazenada<AtividadeLider>('eira_atividades_lideres', []),
 

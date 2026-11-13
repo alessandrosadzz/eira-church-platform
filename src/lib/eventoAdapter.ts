@@ -201,7 +201,7 @@ export async function salvarEventoSupabase(evento: Partial<Evento>): Promise<Eve
     imagem_url: payloadDB.imagem_url || undefined,
     ativo: payloadDB.ativo,
     categoria: (evento.categoria as CategoriaEvento) || 'Outro',
-    rede: evento.rede || 'Padrão',
+    rede: redeEscolhida,
     campos: evento.campos || ['nome', 'telefone', 'email', 'nascimento'],
     total_inscritos: evento.total_inscritos || 0,
     inscritos_confirmados: evento.inscritos_confirmados || 0,
@@ -235,11 +235,31 @@ export function carregarEventosLocal(): Evento[] {
     inscs.forEach((i) => {
       if (i.evento_id) contagem[i.evento_id] = (contagem[i.evento_id] || 0) + 1;
     });
+
+    let mapaRedes: Record<string, string> = {};
+    try {
+      mapaRedes = JSON.parse(localStorage.getItem('eira_eventos_rede_map') || '{}');
+    } catch {}
+
     return evs.map((e) => {
       const total = contagem[e.id] ?? e.total_inscritos ?? 0;
       const vagas = e.vagas || 100;
+
+      let r = e.rede;
+      if (!r || r === 'Padrão') {
+        if (mapaRedes[e.id] || mapaRedes[e.slug]) {
+          r = (mapaRedes[e.id] || mapaRedes[e.slug]) as any;
+        } else {
+          const nomeL = (e.nome || '').toLowerCase();
+          if (nomeL.includes('hype') || nomeL.includes('marcados')) r = 'Hype';
+          else if (nomeL.includes('one way') || nomeL.includes('oneway')) r = 'One Way';
+          else r = 'Padrão';
+        }
+      }
+
       return {
         ...e,
+        rede: r as any,
         total_inscritos: total,
         inscritos_confirmados: total,
         vagas_restantes: Math.max(vagas - total, 0),
@@ -667,18 +687,47 @@ export async function salvarCelulaSupabase(dados: {
 
 export async function atualizarCelulaSupabase(
   celulaId: string,
-  atualizacoes: Partial<Celula>
+  atualizacoes: Partial<Celula> & {
+    usuarioAcesso?: string;
+    senhaAcesso?: string;
+    role?: string;
+  }
 ): Promise<void> {
   const listaLocal = carregarCelulasLocal();
   const celAtual = listaLocal.find((c) => c.id === celulaId);
   const celulaMesclada = { ...(celAtual || {}), ...atualizacoes } as Celula;
 
+  let metaExistente: any = {};
+  if (celAtual?.anfitriao_nome && celAtual.anfitriao_nome.startsWith('{')) {
+    try {
+      metaExistente = JSON.parse(celAtual.anfitriao_nome);
+    } catch {}
+  }
+
   const meta = {
-    viceLider: celulaMesclada.vice_lider_nome || null,
-    anfitriao: celulaMesclada.anfitriao_nome || null,
-    mapsUrl: celulaMesclada.maps_url || null,
-    membros: celulaMesclada.membros || [],
+    ...metaExistente,
+    usuario:
+      atualizacoes.usuarioAcesso !== undefined
+        ? atualizacoes.usuarioAcesso
+        : metaExistente.usuario || null,
+    senha:
+      atualizacoes.senhaAcesso !== undefined
+        ? atualizacoes.senhaAcesso
+        : metaExistente.senha || null,
+    role:
+      atualizacoes.role !== undefined
+        ? atualizacoes.role
+        : metaExistente.role || 'lider_celula',
+    viceLider: celulaMesclada.vice_lider_nome || metaExistente.viceLider || null,
+    anfitriao:
+      celulaMesclada.anfitriao_nome && !celulaMesclada.anfitriao_nome.startsWith('{')
+        ? celulaMesclada.anfitriao_nome
+        : metaExistente.anfitriao || null,
+    mapsUrl: celulaMesclada.maps_url || metaExistente.mapsUrl || null,
+    membros: celulaMesclada.membros || metaExistente.membros || [],
   };
+
+  celulaMesclada.anfitriao_nome = JSON.stringify(meta);
 
   try {
     const payload: any = {
@@ -706,6 +755,128 @@ export async function atualizarCelulaSupabase(
   if (idx >= 0) {
     listaLocal[idx] = celulaMesclada;
     salvarCelulasLocal(listaLocal);
+  }
+}
+
+/**
+ * Atualiza ou promove a função de uma pessoa na igreja (Líder de 12 / Rede, Líder de Célula, Pastor, Admin, Membro).
+ * Sincroniza células, contas de liderança e metadados no Supabase e LocalStorage.
+ */
+export async function atualizarFuncaoLiderSupabase(dados: {
+  pessoaNome: string;
+  telefone?: string | null;
+  email?: string | null;
+  novaFuncao: 'admin' | 'pastor' | 'lider_12' | 'lider_celula' | 'lider' | 'membro';
+  celulaId?: string;
+  rede?: string;
+  celulaNome?: string;
+  novoUsuario?: string;
+  novaSenha?: string;
+}): Promise<void> {
+  const nomeLimpo = dados.pessoaNome.trim();
+  const nomeLower = nomeLimpo.toLowerCase();
+
+  // 1. Atualiza células vinculadas a esta pessoa
+  const celulas = carregarCelulasLocal();
+  let celulaAtualizada = false;
+
+  for (const cel of celulas) {
+    const isLiderDaCelula = cel.lider_nome.trim().toLowerCase() === nomeLower;
+    const isCelulaAlvo = dados.celulaId ? cel.id === dados.celulaId : false;
+
+    if (isLiderDaCelula || isCelulaAlvo) {
+      await atualizarCelulaSupabase(cel.id, {
+        role: dados.novaFuncao === 'membro' ? 'membro' : dados.novaFuncao,
+        usuarioAcesso: dados.novoUsuario,
+        senhaAcesso: dados.novaSenha,
+        rede: dados.rede ? (dados.rede as any) : cel.rede,
+      });
+      celulaAtualizada = true;
+    }
+
+    // Se a pessoa estiver na lista de membros da célula
+    if (Array.isArray(cel.membros)) {
+      const idxMembro = cel.membros.findIndex(
+        (m) => m.nome.trim().toLowerCase() === nomeLower
+      );
+      if (idxMembro >= 0) {
+        const novosMembros = [...cel.membros];
+        const membroAntigo = novosMembros[idxMembro];
+        novosMembros[idxMembro] = {
+          ...membroAntigo,
+          funcao:
+            dados.novaFuncao === 'lider_12' || dados.novaFuncao === 'lider_celula'
+              ? 'Líder'
+              : dados.novaFuncao === 'pastor' || dados.novaFuncao === 'admin'
+              ? 'Líder'
+              : 'Membro',
+        };
+        await atualizarCelulaSupabase(cel.id, { membros: novosMembros });
+      }
+    }
+  }
+
+  // Se for promovida a líder de célula e não tiver célula ainda
+  if (dados.novaFuncao === 'lider_celula' && !celulaAtualizada && dados.celulaNome) {
+    await salvarCelulaSupabase({
+      nome: dados.celulaNome,
+      rede: dados.rede || 'Geral',
+      lider_nome: nomeLimpo,
+      lider_telefone: dados.telefone || '',
+      dia_semana: 'Quinta-feira',
+      horario: '20h00',
+      bairro: 'Centro',
+      endereco: 'Joinville, SC',
+      usuarioAcesso: dados.novoUsuario,
+      senhaAcesso: dados.novaSenha,
+      role: 'lider_celula',
+    });
+  }
+
+  // 2. Atualiza conta de liderança no LocalStorage (eira_lideres)
+  if (typeof window !== 'undefined') {
+    try {
+      const lideresSalvos: any[] = JSON.parse(
+        localStorage.getItem('eira_lideres') || '[]'
+      );
+      const idx = lideresSalvos.findIndex(
+        (l) => l.nome.trim().toLowerCase() === nomeLower
+      );
+
+      if (dados.novaFuncao === 'membro') {
+        const filtrados = lideresSalvos.filter(
+          (l) => l.nome.trim().toLowerCase() !== nomeLower
+        );
+        localStorage.setItem('eira_lideres', JSON.stringify(filtrados));
+      } else {
+        const usuarioValido =
+          dados.novoUsuario ||
+          nomeLimpo
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]+/g, '.');
+
+        const contaAtualizada = {
+          id: idx >= 0 ? lideresSalvos[idx].id : `lid-${Date.now()}`,
+          nome: nomeLimpo,
+          usuarioOuEmail: usuarioValido,
+          senha: dados.novaSenha || (idx >= 0 ? lideresSalvos[idx].senha : 'eira@1212'),
+          telefone: dados.telefone || (idx >= 0 ? lideresSalvos[idx].telefone : ''),
+          celulaNome: dados.celulaNome || (idx >= 0 ? lideresSalvos[idx].celulaNome : 'Célula Eira'),
+          rede: dados.rede || (idx >= 0 ? lideresSalvos[idx].rede : 'Geral'),
+          role: dados.novaFuncao,
+          criadoEm: idx >= 0 ? lideresSalvos[idx].criadoEm : new Date().toISOString(),
+        };
+
+        if (idx >= 0) {
+          lideresSalvos[idx] = contaAtualizada;
+        } else {
+          lideresSalvos.unshift(contaAtualizada);
+        }
+        localStorage.setItem('eira_lideres', JSON.stringify(lideresSalvos));
+      }
+    } catch {}
   }
 }
 
