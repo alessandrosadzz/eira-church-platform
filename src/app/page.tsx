@@ -216,21 +216,27 @@ export default function HomePage() {
             <EventCardSkeleton />
           </div>
         ) : eventosFiltrados.length === 0 ? (
-          <div className="p-16 text-center bg-white rounded-[var(--radius-box,0.75rem)] border border-[#E4E4E7] space-y-3">
-            <Church className="w-12 h-12 text-[#A1A1AA] mx-auto" aria-hidden="true" />
-            <h3 className="text-lg font-bold text-[#0A0A0A]">Nenhum evento encontrado</h3>
-            <p className="text-xs text-[#71717A] max-w-sm mx-auto">
-              Não encontramos eventos disponíveis com os filtros selecionados. Tente selecionar outra rede ou limpar a busca.
-            </p>
-            <button
-              onClick={() => {
-                setBusca('');
-                setRedeFiltro('Todas');
-              }}
-              className="text-xs font-bold text-black underline pt-2 cursor-pointer"
-            >
-              Exibir todos os eventos
-            </button>
+          <div className="p-16 text-center bg-white rounded-[var(--radius-box,0.75rem)] border border-[#E4E4E7] space-y-4">
+            <div className="w-14 h-14 rounded-full bg-[#F4F4F5] text-[#71717A] flex items-center justify-center mx-auto">
+              <Church className="w-7 h-7 text-[#71717A]" aria-hidden="true" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-lg font-extrabold text-[#0A0A0A]">
+                Nenhum evento com inscrições abertas no momento
+              </h3>
+              <p className="text-xs text-[#71717A] max-w-md mx-auto">
+                Em breve divulgaremos os próximos retiros, conferências e eventos oficiais da igreja. Acompanhe nossos cultos e avisos!
+              </p>
+            </div>
+            <div className="pt-2">
+              <Link
+                href="/admin"
+                className="inline-flex items-center space-x-2 text-xs font-bold text-black hover:underline"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span>Acesso Liderança & Pastores →</span>
+              </Link>
+            </div>
           </div>
         ) : (
           <div

@@ -102,21 +102,18 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
           </div>
         </div>
 
-        {/* Controles de Lado Direito: Seletor de Papel, Dark Mode, Tema e Logout */}
+        {/* Controles de Lado Direito: Perfil Ativo, Dark Mode, Tema e Logout */}
         <div className="flex items-center space-x-2 sm:space-x-3">
-          {/* Seletor de Papel (Role) para alternar entre Líder, Pastor e Admin */}
-          <div className="flex items-center space-x-1 bg-[#FAFAFA] border border-[#E4E4E7] p-1 rounded-lg">
-            <UserCheck className="w-3.5 h-3.5 text-[#71717A] ml-1" />
-            <select
-              value={usuarioRole}
-              onChange={(e) => setUsuarioRole(e.target.value as UsuarioRole)}
-              className="text-xs font-bold bg-transparent text-[#0A0A0A] border-none focus:outline-none cursor-pointer py-0.5 pr-1"
-              aria-label="Selecionar papel do usuário"
-            >
-              <option value="admin">Administrador</option>
-              <option value="pastor">Pastor</option>
-              <option value="lider">Líder de Célula</option>
-            </select>
+          {/* Badge do Papel Autenticado */}
+          <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-[#F4F4F5] border border-[#E4E4E7]">
+            <UserCheck className="w-3.5 h-3.5 text-[#71717A]" />
+            <span className="text-xs font-extrabold text-[#0A0A0A] capitalize">
+              {usuarioRole === 'pastor'
+                ? 'Perfil: Pastor'
+                : usuarioRole === 'admin'
+                ? 'Perfil: ADM'
+                : 'Perfil: Líder de Célula'}
+            </span>
           </div>
 
           {/* Alternador de Modo Claro / Modo Escuro */}

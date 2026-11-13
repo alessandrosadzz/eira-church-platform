@@ -36,10 +36,14 @@ import {
   Calendar,
   Lock,
   ArrowRight,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  LogIn,
 } from 'lucide-react';
 
 export default function AdminPage() {
-  const { sucesso, info } = useToast();
+  const { sucesso, erro, info } = useToast();
   const {
     abaAtiva,
     setAbaAtiva,
@@ -50,16 +54,86 @@ export default function AdminPage() {
     visitantes,
     celulas,
     usuarioRole,
+    setUsuarioRole,
+    validarLogin,
   } = useAdminStore();
 
   const heroRef = useRef<HTMLDivElement>(null);
   const cardsRef = useRef<HTMLDivElement>(null);
   const tabContentRef = useRef<HTMLDivElement>(null);
 
-  // Estado de Autenticação
-  const [autenticado, setAutenticado] = useState<boolean>(true); // Logado por padrão para demonstração
-  const [emailLogin, setEmailLogin] = useState('');
+  // Estado de Autenticação Real
+  const [autenticado, setAutenticado] = useState<boolean>(false);
+  const [usuarioLogin, setUsuarioLogin] = useState('');
   const [senhaLogin, setSenhaLogin] = useState('');
+  const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [usuarioNomeLogado, setUsuarioNomeLogado] = useState('');
+
+  // Verifica se há sessão ativa salva no navegador
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const sessaoSalva = localStorage.getItem('eira_auth_session');
+        if (sessaoSalva) {
+          const dados = JSON.parse(sessaoSalva);
+          if (dados && dados.usuario && dados.role) {
+            setAutenticado(true);
+            setUsuarioRole(dados.role);
+            setUsuarioNomeLogado(dados.nome || dados.usuario);
+          }
+        }
+      } catch {}
+    }
+  }, [setUsuarioRole]);
+
+  // Login Handler
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!usuarioLogin.trim() || !senhaLogin.trim()) {
+      erro('Informe seu usuário e senha de acesso.');
+      return;
+    }
+
+    const resultado = validarLogin(usuarioLogin, senhaLogin);
+    if (resultado.valido && resultado.role) {
+      setAutenticado(true);
+      setUsuarioRole(resultado.role);
+      setUsuarioNomeLogado(resultado.nome || usuarioLogin);
+
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(
+            'eira_auth_session',
+            JSON.stringify({
+              usuario: usuarioLogin.trim(),
+              role: resultado.role,
+              nome: resultado.nome,
+              logadoEm: new Date().toISOString(),
+            })
+          );
+        } catch {}
+      }
+
+      sucesso(`Acesso confirmado: ${resultado.nome}!`);
+    } else {
+      erro('Credenciais inválidas. Verifique seu usuário e senha.');
+    }
+  };
+
+  // Logout Handler
+  const handleLogout = () => {
+    setAutenticado(false);
+    setUsuarioLogin('');
+    setSenhaLogin('');
+    setUsuarioNomeLogado('');
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('eira_auth_session');
+      } catch {}
+    }
+    info('Você encerrou a sessão no painel.');
+  };
 
   // Estado dos Dados
   const [eventos, setEventos] = useState<Evento[]>(SEED_EVENTOS);
@@ -173,56 +247,96 @@ export default function AdminPage() {
     }
   };
 
-  // Se não estiver autenticado, exibe tela de login limpa
+  // Se não estiver autenticado, exibe tela de login oficial
   if (!autenticado) {
     return (
-      <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white p-8 rounded-[var(--radius-box,0.75rem)] border border-[#E4E4E7] shadow-modal space-y-6 text-left">
-          <div className="text-center space-y-2">
-            <div className="w-12 h-12 rounded-[var(--radius-btn,0.5rem)] bg-black text-[var(--accent,#FACC15)] flex items-center justify-center font-black text-2xl mx-auto border border-black shadow-sm">
+      <div className="min-h-screen bg-[#09090B] flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-[#141418] p-8 rounded-[var(--radius-box,0.75rem)] border border-[#2E2E35] shadow-2xl space-y-6 text-left">
+          <div className="text-center space-y-3">
+            <div className="w-14 h-14 rounded-[var(--radius-btn,0.5rem)] bg-black text-[var(--accent,#FACC15)] flex items-center justify-center font-black text-2xl mx-auto border border-[#2E2E35] shadow-md">
               {igrejaConfig.nome.charAt(0)}
             </div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-[#0A0A0A]">
-              {igrejaConfig.nome} // Painel
-            </h1>
-            <p className="text-xs text-[#71717A]">
-              Acesso para pastores, líderes e equipe de conexão da igreja.
-            </p>
+            <div>
+              <h1 className="text-2xl font-black tracking-tight text-[#FAFAFA]">
+                {igrejaConfig.nome}
+              </h1>
+              <p className="text-xs text-[#A1A1AA] mt-1">
+                Acesso à Liderança, Pastores e Administração
+              </p>
+            </div>
           </div>
 
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              setAutenticado(true);
-            }}
-            className="space-y-4"
-          >
-            <Input
-              label="E-mail de Acesso"
-              type="email"
-              required
-              value={emailLogin}
-              onChange={(e) => setEmailLogin(e.target.value)}
-              placeholder="lideranca@eirachurch.com.br"
-            />
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-tight text-[#E4E4E7] mb-1.5">
+                Usuário ou E-mail
+              </label>
+              <input
+                type="text"
+                required
+                value={usuarioLogin}
+                onChange={(e) => setUsuarioLogin(e.target.value)}
+                placeholder="pastores, admin ou seu usuário"
+                className="w-full h-12 px-3.5 rounded-lg bg-[#1D1D23] border border-[#2E2E35] text-sm text-[#FAFAFA] placeholder-[#71717A] focus:outline-none focus:ring-2 focus:ring-[var(--accent,#FACC15)] focus:border-transparent transition-all"
+              />
+            </div>
 
-            <Input
-              label="Senha"
-              type="password"
-              required
-              value={senhaLogin}
-              onChange={(e) => setSenhaLogin(e.target.value)}
-              placeholder="••••••••"
-            />
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-tight text-[#E4E4E7] mb-1.5">
+                Senha de Acesso
+              </label>
+              <div className="relative">
+                <input
+                  type={mostrarSenha ? 'text' : 'password'}
+                  required
+                  value={senhaLogin}
+                  onChange={(e) => setSenhaLogin(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full h-12 pl-3.5 pr-10 rounded-lg bg-[#1D1D23] border border-[#2E2E35] text-sm text-[#FAFAFA] placeholder-[#71717A] focus:outline-none focus:ring-2 focus:ring-[var(--accent,#FACC15)] focus:border-transparent transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setMostrarSenha(!mostrarSenha)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717A] hover:text-[#FAFAFA] transition-colors p-1"
+                  aria-label={mostrarSenha ? 'Ocultar senha' : 'Ver senha'}
+                >
+                  {mostrarSenha ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
 
-            <Button type="submit" variant="primary" fullWidth>
-              Fazer login no Painel
+            <Button type="submit" variant="primary" fullWidth size="lg">
+              <LogIn className="w-4 h-4 mr-2" />
+              <span>Entrar no Painel</span>
             </Button>
           </form>
 
-          <div className="text-center pt-2">
-            <Link href="/" className="text-xs text-[#71717A] hover:text-black">
-              ← Voltar para a página pública
+          {/* Orientações Oficiais de Acesso */}
+          <div className="p-3.5 rounded-lg bg-[#1D1D23] border border-[#2E2E35] text-[11px] text-[#A1A1AA] space-y-1.5">
+            <div className="flex items-center space-x-1.5 text-[#FAFAFA] font-bold">
+              <ShieldCheck className="w-3.5 h-3.5 text-[var(--accent,#FACC15)]" />
+              <span>Instruções de Acesso:</span>
+            </div>
+            <p>
+              • <strong>Pastores:</strong> usuário <code className="bg-[#141418] px-1 py-0.5 rounded text-[var(--accent,#FACC15)] font-bold">pastores</code>
+            </p>
+            <p>
+              • <strong>Administração:</strong> usuário <code className="bg-[#141418] px-1 py-0.5 rounded text-[var(--accent,#FACC15)] font-bold">admin</code>
+            </p>
+            <p className="pt-1 text-[#E4E4E7]">
+              • <strong>Líder de Célula:</strong> Já cadastrou sua célula? Use seu usuário. Ainda não?{' '}
+              <Link href="/cadastro-lider" className="text-[var(--accent,#FACC15)] font-bold underline">
+                Cadastrar Célula e Login →
+              </Link>
+            </p>
+          </div>
+
+          <div className="text-center pt-1">
+            <Link
+              href="/"
+              className="text-xs font-semibold text-[#71717A] hover:text-[#FAFAFA] transition-colors"
+            >
+              ← Voltar para o Portal da Igreja
             </Link>
           </div>
         </div>
@@ -235,7 +349,7 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] flex flex-col transition-colors">
-      <AdminHeader onLogout={() => setAutenticado(false)} />
+      <AdminHeader onLogout={handleLogout} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1 space-y-8">
         <div ref={tabContentRef}>

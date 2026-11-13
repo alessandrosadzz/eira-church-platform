@@ -86,3 +86,14 @@ export interface Celula {
   maps_url: string;
   membros: CelulaMembro[];
 }
+
+export interface LiderConta {
+  id: string;
+  nome: string;
+  usuarioOuEmail: string;
+  senha: string;
+  telefone: string;
+  celulaNome: string;
+  rede: string;
+  criadoEm: string;
+}

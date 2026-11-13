@@ -16,22 +16,25 @@ import {
   ArrowLeft,
   Users,
   ShieldCheck,
+  LogIn,
 } from 'lucide-react';
 
 export default function CadastroLiderPage() {
   const { sucesso, erro } = useToast();
-  const { igrejaConfig, adicionarCelula } = useAdminStore();
+  const { igrejaConfig, adicionarCelula, cadastrarLider } = useAdminStore();
 
   const [nomeLider, setNomeLider] = useState('');
   const [telefoneLider, setTelefoneLider] = useState('');
   const [emailLider, setEmailLider] = useState('');
+  const [usuarioAcesso, setUsuarioAcesso] = useState('');
+  const [senhaAcesso, setSenhaAcesso] = useState('');
+
   const [nomeCelula, setNomeCelula] = useState('');
   const [rede, setRede] = useState<'Hype' | 'One Way' | 'Família' | 'Casais' | 'Adultos'>('Hype');
   const [diaSemana, setDiaSemana] = useState('Quinta-feira');
   const [horario, setHorario] = useState('20h00');
   const [bairro, setBairro] = useState('');
   const [endereco, setEndereco] = useState('');
-  const [quantidadeMembros, setQuantidadeMembros] = useState(4);
   const [viceLider, setViceLider] = useState('');
   const [anfitriao, setAnfitriao] = useState('');
 
@@ -48,6 +51,14 @@ export default function CadastroLiderPage() {
       erro('Informe seu WhatsApp para contato pastoral.');
       return;
     }
+    if (!usuarioAcesso.trim()) {
+      erro('Defina um usuário ou e-mail para seu login.');
+      return;
+    }
+    if (!senhaAcesso.trim() || senhaAcesso.length < 4) {
+      erro('Defina uma senha com no mínimo 4 caracteres.');
+      return;
+    }
     if (!nomeCelula.trim()) {
       erro('Informe o nome da sua célula.');
       return;
@@ -57,6 +68,7 @@ export default function CadastroLiderPage() {
       `${endereco || bairro}, Cascavel - PR`
     )}`;
 
+    // 1. Cadastra a célula no mapa e na rede
     adicionarCelula({
       nome: nomeCelula.trim(),
       rede,
@@ -81,7 +93,17 @@ export default function CadastroLiderPage() {
       ],
     });
 
-    sucesso('Célula cadastrada na base oficial da igreja!');
+    // 2. Cadastra o acesso de login do líder
+    cadastrarLider({
+      nome: nomeLider.trim(),
+      usuarioOuEmail: usuarioAcesso.trim(),
+      senha: senhaAcesso.trim(),
+      telefone: telefoneLider.trim(),
+      celulaNome: nomeCelula.trim(),
+      rede,
+    });
+
+    sucesso('Célula e acesso de liderança registrados com sucesso!');
     setCadastradoComSucesso(true);
   };
 
@@ -95,15 +117,18 @@ export default function CadastroLiderPage() {
 
           <div className="space-y-2">
             <h1 className="text-2xl font-extrabold text-[#0A0A0A] tracking-tight">
-              Célula Registrada com Sucesso!
+              Célula e Acesso Registrados!
             </h1>
             <p className="text-xs text-[#52525B] leading-relaxed">
               Olá, <strong className="text-black">{nomeLider}</strong>! Sua célula{' '}
-              <strong className="text-black">"{nomeCelula}"</strong> foi incluída no mapa e na rede oficial de células da {igrejaConfig.nome}.
+              <strong className="text-black">"{nomeCelula}"</strong> foi cadastrada na rede e seu usuário de acesso <strong className="text-black">"{usuarioAcesso}"</strong> já está liberado para login.
             </p>
           </div>
 
           <div className="p-4 rounded-xl bg-[#FAFAFA] border border-[#E4E4E7] text-xs text-left space-y-1.5">
+            <p className="text-[#52525B]">
+              <strong className="text-black">Usuário de Login:</strong> {usuarioAcesso}
+            </p>
             <p className="text-[#52525B]">
               <strong className="text-black">Rede:</strong> {rede}
             </p>
@@ -111,14 +136,21 @@ export default function CadastroLiderPage() {
               <strong className="text-black">Encontro:</strong> {diaSemana} às {horario}
             </p>
             <p className="text-[#52525B]">
-              <strong className="text-black">Bairro:</strong> {bairro}
+              <strong className="text-black">Bairro:</strong> {bairro || 'Centro'}
             </p>
           </div>
 
           <div className="pt-2 flex flex-col gap-2">
             <Link
+              href="/admin"
+              className="w-full py-3.5 rounded-lg text-xs font-black bg-[#0A0A0A] text-[var(--accent,#FACC15)] hover:bg-[#27272A] transition-colors flex items-center justify-center space-x-2"
+            >
+              <LogIn className="w-4 h-4" />
+              <span>Fazer Login no Painel Agora</span>
+            </Link>
+            <Link
               href="/"
-              className="w-full py-3 rounded-lg text-xs font-bold bg-[#0A0A0A] text-white hover:bg-[#27272A] transition-colors block text-center"
+              className="w-full py-2.5 rounded-lg text-xs font-bold text-[#71717A] hover:text-black transition-colors block text-center"
             >
               Voltar para a Página Inicial
             </Link>
@@ -138,41 +170,43 @@ export default function CadastroLiderPage() {
             className="inline-flex items-center space-x-1.5 text-xs font-bold text-[#71717A] hover:text-[#0A0A0A]"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Voltar ao início</span>
+            <span>Página Inicial</span>
           </Link>
-
           <div className="flex items-center space-x-2">
-            <span className="font-extrabold text-sm text-[#0A0A0A]">{igrejaConfig.nome}</span>
-            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-black text-[var(--accent,#FACC15)]">
-              Rede de Células
+            <div className="w-6 h-6 rounded bg-[#0A0A0A] text-[var(--accent,#FACC15)] flex items-center justify-center font-black text-xs">
+              {igrejaConfig.nome.charAt(0)}
+            </div>
+            <span className="text-xs font-bold text-[#0A0A0A]">
+              {igrejaConfig.nome} // Liderança
             </span>
           </div>
         </div>
       </header>
 
-      {/* Conteúdo Principal */}
-      <main className="max-w-2xl mx-auto w-full px-4 py-8 flex-1">
+      {/* Formulário Central */}
+      <main className="max-w-2xl mx-auto px-4 py-8 w-full flex-1">
+        <div className="mb-6 space-y-1">
+          <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#FEF08A] text-[#854D0E] mb-2">
+            <Users className="w-3.5 h-3.5" />
+            <span>Cadastro Oficial de Líderes de Célula</span>
+          </div>
+          <h1 className="text-2xl font-black text-[#0A0A0A] tracking-tight">
+            Registre sua Célula e Crie seu Login
+          </h1>
+          <p className="text-xs text-[#71717A]">
+            Preencha os dados da sua célula e crie sua senha para acessar o painel de líderes.
+          </p>
+        </div>
+
         <form
           onSubmit={handleSubmit}
-          className="bg-white p-6 sm:p-8 rounded-[var(--radius-box,0.75rem)] border border-[#E4E4E7] shadow-sm space-y-6 text-left"
+          className="bg-white p-6 sm:p-8 rounded-[var(--radius-box,0.75rem)] border border-[#E4E4E7] shadow-sm space-y-6"
         >
-          <div className="border-b border-[#E4E4E7] pb-4 space-y-1">
-            <div className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-[11px] font-black uppercase bg-[#F4F4F5] text-[#52525B]">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Link Exclusivo de Líderes</span>
-            </div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-[#0A0A0A]">
-              Cadastro da sua Célula // {igrejaConfig.nome}
-            </h1>
-            <p className="text-xs text-[#71717A] leading-relaxed">
-              Preencha os dados da sua célula para mapeamento no Google Maps, apoio pastoral e encaminhamento de novos visitantes acolhidos.
-            </p>
-          </div>
-
-          {/* Dados do Líder */}
+          {/* 1. Dados do Líder e Acesso */}
           <div className="space-y-4">
-            <h2 className="text-xs font-bold uppercase tracking-tight text-[#0A0A0A]">
-              1. Seus Dados como Líder
+            <h2 className="text-sm font-extrabold text-[#0A0A0A] flex items-center space-x-2 pb-2 border-b border-[#F4F4F5]">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <span>1. Identificação do Líder & Login</span>
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -187,28 +221,47 @@ export default function CadastroLiderPage() {
               </div>
 
               <Input
-                label="Seu WhatsApp com DDD"
+                label="WhatsApp / Telefone"
                 required
-                type="tel"
                 value={telefoneLider}
                 onChange={(e) => setTelefoneLider(e.target.value)}
-                placeholder="(45) 99881-2233"
+                placeholder="(00) 00000-0000"
               />
 
               <Input
-                label="Seu E-mail (Opcional)"
+                label="E-mail de Contato"
                 type="email"
                 value={emailLider}
                 onChange={(e) => setEmailLider(e.target.value)}
-                placeholder="seu@email.com"
+                placeholder="seuemail@exemplo.com"
+              />
+
+              <Input
+                label="Usuário para Login no Painel"
+                required
+                value={usuarioAcesso}
+                onChange={(e) => setUsuarioAcesso(e.target.value)}
+                placeholder="ex: gabriel.silva"
+                helperText="Nome de usuário que você usará para entrar no painel."
+              />
+
+              <Input
+                label="Senha de Acesso"
+                type="password"
+                required
+                value={senhaAcesso}
+                onChange={(e) => setSenhaAcesso(e.target.value)}
+                placeholder="••••••••"
+                helperText="Crie sua senha de acesso (mínimo 4 caracteres)."
               />
             </div>
           </div>
 
-          {/* Dados da Célula */}
-          <div className="space-y-4 pt-4 border-t border-[#E4E4E7]">
-            <h2 className="text-xs font-bold uppercase tracking-tight text-[#0A0A0A]">
-              2. Informações da Célula
+          {/* 2. Dados da Célula */}
+          <div className="space-y-4 pt-2">
+            <h2 className="text-sm font-extrabold text-[#0A0A0A] flex items-center space-x-2 pb-2 border-b border-[#F4F4F5]">
+              <Home className="w-4 h-4 text-[#71717A]" />
+              <span>2. Informações da Célula</span>
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -224,18 +277,19 @@ export default function CadastroLiderPage() {
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-tight text-[#0A0A0A] mb-1.5">
-                  Rede Ministerial
+                  Rede Pertencente
                 </label>
                 <select
                   value={rede}
-                  onChange={(e) => setRede(e.target.value as any)}
+                  onChange={(e) =>
+                    setRede(e.target.value as 'Hype' | 'One Way' | 'Família' | 'Casais' | 'Adultos')
+                  }
                   className="w-full h-12 px-3 rounded-lg bg-white border border-[#E4E4E7] text-sm text-[#0A0A0A]"
                 >
-                  <option value="Hype">Rede Hype (Teens)</option>
-                  <option value="One Way">Rede One Way (Jovens & Universitários)</option>
-                  <option value="Família">Rede da Família</option>
-                  <option value="Casais">Rede de Casais</option>
-                  <option value="Adultos">Rede de Adultos</option>
+                  <option value="Hype">Rede Hype (Teens / Adolescentes)</option>
+                  <option value="One Way">Rede One Way (Jovens / Universitários)</option>
+                  <option value="Família">Rede Família & Casais</option>
+                  <option value="Adultos">Rede Adultos</option>
                 </select>
               </div>
 
@@ -302,7 +356,7 @@ export default function CadastroLiderPage() {
 
           <div className="pt-4 border-t border-[#E4E4E7] flex items-center justify-end">
             <Button type="submit" variant="primary" size="lg" fullWidth>
-              Concluir Cadastro da Minha Célula
+              Concluir Cadastro da Minha Célula e Login
             </Button>
           </div>
         </form>
