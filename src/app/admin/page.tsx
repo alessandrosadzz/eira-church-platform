@@ -159,10 +159,10 @@ export default function AdminPage() {
   const [eventos, setEventos] = useState<Evento[]>(SEED_EVENTOS);
   const [inscricoes, setInscricoes] = useState<Inscricao[]>(SEED_INSCRICOES);
 
-  // Filtro Temporal de Pessoas e Frequência (Pastores e Admins)
+  // Filtro Temporal de Pessoas e Frequência (Pastores, Líderes e Conexão)
   const [filtroPeriodo, setFiltroPeriodo] = useState<
-    'hoje' | 'mes_atual' | 'mes_passado' | 'ano' | 'todos'
-  >('mes_atual');
+    'esta_semana' | 'semana_1' | 'semana_2' | 'semana_3' | 'semana_4' | 'mes_atual' | 'ano' | 'todos'
+  >('esta_semana');
 
   // Modal Central de Atualizações e Novidades da Plataforma
   const [modalAtualizacoesAberto, setModalAtualizacoesAberto] = useState(false);
@@ -252,12 +252,19 @@ export default function AdminPage() {
       : 0;
 
   // Papéis de Acesso e Permissões
+  const isConexao = usuarioRole === 'conexao';
   const isLiderCelula = usuarioRole === 'lider_celula' || usuarioRole === 'lider';
   const isLider12 = usuarioRole === 'lider_12';
   const isDiretoria = usuarioRole === 'pastor' || usuarioRole === 'admin';
   const podeAcessarFinancas = isDiretoria;
 
   // Proteção estrita de abas por perfil
+  useEffect(() => {
+    if (isConexao && abaAtiva !== 'conexao') {
+      setAbaAtiva('conexao');
+    }
+  }, [isConexao, abaAtiva, setAbaAtiva]);
+
   useEffect(() => {
     if (
       isLiderCelula &&
@@ -271,7 +278,7 @@ export default function AdminPage() {
   }, [isLiderCelula, abaAtiva, setAbaAtiva]);
 
   useEffect(() => {
-    if (isLider12 && abaAtiva === 'configuracao') {
+    if (isLider12 && (abaAtiva === 'configuracao' || abaAtiva === 'novo-evento')) {
       setAbaAtiva('dashboard');
     }
   }, [isLider12, abaAtiva, setAbaAtiva]);
@@ -322,38 +329,89 @@ export default function AdminPage() {
 
   // Visitantes Filtrados pelo Período Selecionado
   const visitantesNoPeriodo = useMemo(() => {
-    const hoje = new Date().toISOString().split('T')[0];
     const agora = new Date();
     const anoAtual = agora.getFullYear();
     const mesAtual = agora.getMonth();
 
+    const inicioSemana = new Date(agora);
+    inicioSemana.setDate(agora.getDate() - agora.getDay());
+    inicioSemana.setHours(0, 0, 0, 0);
+
+    const fimSemana = new Date(inicioSemana);
+    fimSemana.setDate(inicioSemana.getDate() + 6);
+    fimSemana.setHours(23, 59, 59, 999);
+
     return visitantes.filter((v) => {
       if (filtroPeriodo === 'todos') return true;
-      const dataStr = v.data_visita || hoje;
-      const dataV = new Date(dataStr);
+      const dataStr = v.data_visita || agora.toISOString().split('T')[0];
+      const [anoStr, mesStr, diaStr] = dataStr.split('-');
+      const anoV = parseInt(anoStr, 10);
+      const mesV = parseInt(mesStr, 10) - 1;
+      const diaV = parseInt(diaStr, 10);
+      const dataV = new Date(anoV, mesV, diaV);
 
-      if (filtroPeriodo === 'hoje') {
-        return dataStr === hoje;
+      if (filtroPeriodo === 'esta_semana') {
+        return dataV >= inicioSemana && dataV <= fimSemana;
+      }
+      if (filtroPeriodo === 'semana_1') {
+        return anoV === anoAtual && mesV === mesAtual && diaV >= 1 && diaV <= 7;
+      }
+      if (filtroPeriodo === 'semana_2') {
+        return anoV === anoAtual && mesV === mesAtual && diaV >= 8 && diaV <= 14;
+      }
+      if (filtroPeriodo === 'semana_3') {
+        return anoV === anoAtual && mesV === mesAtual && diaV >= 15 && diaV <= 21;
+      }
+      if (filtroPeriodo === 'semana_4') {
+        return anoV === anoAtual && mesV === mesAtual && diaV >= 22;
       }
       if (filtroPeriodo === 'mes_atual') {
-        return (
-          dataV.getFullYear() === anoAtual && dataV.getMonth() === mesAtual
-        );
-      }
-      if (filtroPeriodo === 'mes_passado') {
-        const mesPassado = mesAtual === 0 ? 11 : mesAtual - 1;
-        const anoDoMesPassado = mesAtual === 0 ? anoAtual - 1 : anoAtual;
-        return (
-          dataV.getFullYear() === anoDoMesPassado &&
-          dataV.getMonth() === mesPassado
-        );
+        return anoV === anoAtual && mesV === mesAtual;
       }
       if (filtroPeriodo === 'ano') {
-        return dataV.getFullYear() === anoAtual;
+        return anoV === anoAtual;
       }
       return true;
     });
   }, [visitantes, filtroPeriodo]);
+
+  // Métricas Rápidas de Conexão para o Dashboard Home
+  const metricasConexaoHome = useMemo(() => {
+    const agora = new Date();
+    const anoAtual = agora.getFullYear();
+    const mesAtual = agora.getMonth();
+
+    const inicioSemana = new Date(agora);
+    inicioSemana.setDate(agora.getDate() - agora.getDay());
+    inicioSemana.setHours(0, 0, 0, 0);
+
+    const fimSemana = new Date(inicioSemana);
+    fimSemana.setDate(inicioSemana.getDate() + 6);
+    fimSemana.setHours(23, 59, 59, 999);
+
+    const essaSemana = visitantes.filter((v) => {
+      const dataStr = v.data_visita || agora.toISOString().split('T')[0];
+      const [anoStr, mesStr, diaStr] = dataStr.split('-');
+      const d = new Date(parseInt(anoStr, 10), parseInt(mesStr, 10) - 1, parseInt(diaStr, 10));
+      return d >= inicioSemana && d <= fimSemana;
+    }).length;
+
+    const esteMes = visitantes.filter((v) => {
+      const dataStr = v.data_visita || agora.toISOString().split('T')[0];
+      const [anoStr, mesStr] = dataStr.split('-');
+      return parseInt(anoStr, 10) === anoAtual && parseInt(mesStr, 10) - 1 === mesAtual;
+    }).length;
+
+    const novosAguardando = visitantes.filter((v) => v.status === 'novo').length;
+    const jaNaCelula = visitantes.filter((v) => v.ja_participa_celula).length;
+
+    return {
+      essaSemana,
+      esteMes,
+      novosAguardando,
+      jaNaCelula,
+    };
+  }, [visitantes]);
 
   // Total de Pessoas com a gente na Igreja (Membros de células + visitantes da Conexão)
   const totalPessoasNaIgreja = useMemo(() => {
@@ -536,12 +594,23 @@ export default function AdminPage() {
             <p>
               • <strong>Líder de Rede (12):</strong> usuário <code className="bg-[#141418] px-1 py-0.5 rounded text-[var(--accent,#FACC15)] font-bold">lider12</code> ou suas credenciais individuais
             </p>
-            <p className="pt-1 text-[#E4E4E7]">
-              • <strong>Líder de Célula:</strong> Já cadastrou sua célula? Use seu usuário. Ainda não?{' '}
-              <Link href="/cadastro-lider" className="text-[var(--accent,#FACC15)] font-bold underline">
-                Cadastrar Célula e Login →
-              </Link>
+            <p>
+              • <strong>Equipe Conexão:</strong> usuário <code className="bg-[#141418] px-1 py-0.5 rounded text-[var(--accent,#FACC15)] font-bold">conexao</code> (Acolhimento & Visitantes)
             </p>
+            <div className="pt-1.5 border-t border-[#2E2E35] space-y-1 text-[#E4E4E7]">
+              <p>
+                • <strong>Líder de Célula:</strong>{' '}
+                <Link href="/cadastro-lider-celula" className="text-[var(--accent,#FACC15)] font-bold underline">
+                  Cadastrar Célula e Acesso →
+                </Link>
+              </p>
+              <p>
+                • <strong>Líder de 12:</strong>{' '}
+                <Link href="/cadastro-lider-12" className="text-[var(--accent,#FACC15)] font-bold underline">
+                  Cadastrar Rede de 12 e Acesso →
+                </Link>
+              </p>
+            </div>
           </div>
 
           <div className="text-center pt-1">
@@ -567,7 +636,7 @@ export default function AdminPage() {
         carregando={carregandoDados}
       />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1 space-y-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8 w-full flex-1 space-y-6 sm:space-y-8">
         <div ref={tabContentRef}>
           {/* ==================================================== */}
           {/* ABA: PAINEL GERAL (DASHBOARD) */}
@@ -646,7 +715,7 @@ export default function AdminPage() {
                         type="button"
                         onClick={() => {
                           const origin = typeof window !== 'undefined' ? window.location.origin : '';
-                          const url = `${origin}/cadastro-lider?tipo=lider_celula&por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`;
+                          const url = `${origin}/cadastro-lider-celula?por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`;
                           navigator.clipboard.writeText(url);
                           sucesso('Link de convite para Líder de Célula copiado!');
                         }}
@@ -729,7 +798,7 @@ export default function AdminPage() {
                           type="button"
                           onClick={() => {
                             const origin = typeof window !== 'undefined' ? window.location.origin : '';
-                            const url = `${origin}/cadastro-lider?tipo=lider_celula&por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`;
+                            const url = `${origin}/cadastro-lider-celula?por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`;
                             navigator.clipboard.writeText(url);
                             sucesso('Link de convite para Líder de Célula copiado com sucesso!');
                           }}
@@ -742,7 +811,7 @@ export default function AdminPage() {
                           href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
                             `Graça e paz! Segue o link oficial para você cadastrar a sua célula e ativar seu acesso de Líder na Eira Church: ${
                               typeof window !== 'undefined' ? window.location.origin : ''
-                            }/cadastro-lider?tipo=lider_celula&por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`
+                            }/cadastro-lider-celula?por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`
                           )}`}
                           target="_blank"
                           rel="noreferrer"
@@ -770,7 +839,7 @@ export default function AdminPage() {
                           type="button"
                           onClick={() => {
                             const origin = typeof window !== 'undefined' ? window.location.origin : '';
-                            const url = `${origin}/cadastro-lider?tipo=lider_12&por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`;
+                            const url = `${origin}/cadastro-lider-12?por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`;
                             navigator.clipboard.writeText(url);
                             sucesso('Link de convite para Líder de 12 copiado com sucesso!');
                           }}
@@ -783,7 +852,7 @@ export default function AdminPage() {
                           href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
                             `Graça e paz! Segue o link oficial para você cadastrar seu acesso como Líder de 12 na Eira Church: ${
                               typeof window !== 'undefined' ? window.location.origin : ''
-                            }/cadastro-lider?tipo=lider_12&por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`
+                            }/cadastro-lider-12?por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`
                           )}`}
                           target="_blank"
                           rel="noreferrer"
@@ -1114,35 +1183,38 @@ export default function AdminPage() {
               ) : (
                 /* SE LÍDER DE 12, PASTOR OU ADMINISTRADOR: Dashboard Completo com Filtro Temporal Mês a Mês e Ano */
                 <div className="space-y-8">
-                  {/* Seletor Temporal de Frequência & Membresia */}
+                  {/* Seletor Temporal de Frequência & Membresia / Conexão */}
                   <div className="p-5 rounded-[var(--radius-box,0.75rem)] bg-white border border-[#E4E4E7] shadow-sm space-y-4 text-left">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[#F4F4F5] pb-3">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-[#F4F4F5] pb-3">
                       <div>
                         <div className="flex items-center space-x-2">
                           <TrendingUp className="w-4 h-4 text-[var(--accent-hover,#CA8A04)]" />
                           <h3 className="font-extrabold text-base text-[#0A0A0A]">
-                            Raio-X de Frequência, Almas e Membresia
+                            Painel de Frequência & Conexão
                           </h3>
                         </div>
                         <p className="text-xs text-[#71717A]">
-                          Monitore quantas pessoas temos na igreja, células e visitantes acolhidos no período.
+                          Acompanhe quantas pessoas vieram essa semana, no mês e filtre semana a semana.
                         </p>
                       </div>
 
-                      {/* Filtros Temporais */}
-                      <div className="flex flex-wrap items-center gap-1.5">
+                      {/* Filtros Temporais: Semana, 2ª Semana, 3ª Semana, 4ª Semana, Mês, Ano */}
+                      <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
                         {[
-                          { id: 'hoje', label: 'Hoje' },
+                          { id: 'esta_semana', label: 'Essa Semana' },
+                          { id: 'semana_1', label: '1ª Semana' },
+                          { id: 'semana_2', label: '2ª Semana' },
+                          { id: 'semana_3', label: '3ª Semana' },
+                          { id: 'semana_4', label: '4ª Semana' },
                           { id: 'mes_atual', label: 'Este Mês' },
-                          { id: 'mes_passado', label: 'Mês Passado' },
-                          { id: 'ano', label: 'Este Ano' },
-                          { id: 'todos', label: 'Total Histórico' },
+                          { id: 'ano', label: 'Ano' },
+                          { id: 'todos', label: 'Histórico' },
                         ].map((p) => (
                           <button
                             key={p.id}
                             type="button"
                             onClick={() => setFiltroPeriodo(p.id as any)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                               filtroPeriodo === p.id
                                 ? 'bg-black text-[var(--accent,#FACC15)] border border-black shadow-xs'
                                 : 'bg-[#F4F4F5] text-[#71717A] border border-[#E4E4E7] hover:border-black'
@@ -1154,42 +1226,48 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    {/* 4 Cards de Pessoas & Frequência */}
+                    {/* 4 Cards do Dashboard de Conexão & Frequência */}
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                       <MetricCard
-                        titulo="Pessoas na Igreja"
-                        valor={totalPessoasNaIgreja}
-                        subtexto="Membros ativos + Almas acolhidas"
-                        icone={Users}
+                        titulo="Visitantes Essa Semana"
+                        valor={metricasConexaoHome.essaSemana}
+                        subtexto="Acolhidos no culto recente"
+                        icone={HeartHandshake}
                         destaque
+                      />
+                      <MetricCard
+                        titulo="Visitantes Este Mês"
+                        valor={metricasConexaoHome.esteMes}
+                        subtexto="Total de almas acolhidas"
+                        icone={Users}
+                      />
+                      <MetricCard
+                        titulo="Pessoas no Período"
+                        valor={visitantesNoPeriodo.length}
+                        subtexto={`Filtro: ${
+                          filtroPeriodo === 'esta_semana'
+                            ? 'Essa semana'
+                            : filtroPeriodo === 'semana_1'
+                            ? '1ª semana do mês'
+                            : filtroPeriodo === 'semana_2'
+                            ? '2ª semana do mês'
+                            : filtroPeriodo === 'semana_3'
+                            ? '3ª semana do mês'
+                            : filtroPeriodo === 'semana_4'
+                            ? '4ª semana do mês'
+                            : filtroPeriodo === 'mes_atual'
+                            ? 'Este mês'
+                            : filtroPeriodo === 'ano'
+                            ? 'Este ano'
+                            : 'Todo histórico'
+                        }`}
+                        icone={TrendingUp}
                       />
                       <MetricCard
                         titulo="Pessoas nas Células"
                         valor={totalMembrosCelulas}
                         subtexto={`Em ${celulas.length} células ativas`}
                         icone={Home}
-                      />
-                      <MetricCard
-                        titulo="Visitantes no Período"
-                        valor={visitantesNoPeriodo.length}
-                        subtexto={`Filtro: ${
-                          filtroPeriodo === 'hoje'
-                            ? 'Hoje'
-                            : filtroPeriodo === 'mes_atual'
-                            ? 'Mês atual'
-                            : filtroPeriodo === 'mes_passado'
-                            ? 'Mês passado'
-                            : filtroPeriodo === 'ano'
-                            ? 'Ano atual'
-                            : 'Todo histórico'
-                        }`}
-                        icone={HeartHandshake}
-                      />
-                      <MetricCard
-                        titulo="Batismo & Discipulado"
-                        valor={`${totalBatizadosCelulas} (${percentualBatizados}%)`}
-                        subtexto="Membros batizados nas águas"
-                        icone={Droplets}
                       />
                     </div>
                   </div>
@@ -1477,17 +1555,19 @@ export default function AdminPage() {
                     Gerencie banners, datas, valores e formulários:
                   </p>
                 </div>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onClick={() => {
-                    setEventoParaEditar(null);
-                    setAbaAtiva('novo-evento');
-                  }}
-                >
-                  <PlusCircle className="w-4 h-4 mr-1.5" />
-                  Cadastrar Novo Evento
-                </Button>
+                {isDiretoria && (
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={() => {
+                      setEventoParaEditar(null);
+                      setAbaAtiva('novo-evento');
+                    }}
+                  >
+                    <PlusCircle className="w-4 h-4 mr-1.5" />
+                    Cadastrar Novo Evento
+                  </Button>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1547,16 +1627,18 @@ export default function AdminPage() {
                             <Copy className="w-3.5 h-3.5 mr-1" />
                             Copiar Link
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEventoParaEditar(ev);
-                              setAbaAtiva('novo-evento');
-                            }}
-                            className="text-xs font-bold text-black hover:text-[var(--accent-hover,#CA8A04)] cursor-pointer"
-                          >
-                            ✏️ Editar Evento
-                          </button>
+                          {isDiretoria && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEventoParaEditar(ev);
+                                setAbaAtiva('novo-evento');
+                              }}
+                              className="text-xs font-bold text-black hover:text-[var(--accent-hover,#CA8A04)] cursor-pointer"
+                            >
+                              ✏️ Editar Evento
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>

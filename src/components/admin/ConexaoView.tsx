@@ -23,6 +23,8 @@ import {
   ChevronRight,
   Share2,
   RefreshCw,
+  Edit2,
+  ExternalLink,
 } from 'lucide-react';
 import {
   salvarVisitanteSupabase,
@@ -36,6 +38,7 @@ export const ConexaoView: React.FC = () => {
     setVisitantes,
     adicionarVisitante,
     atualizarStatusVisitante,
+    atualizarVisitante,
     removerVisitante,
     igrejaConfig,
   } = useAdminStore();
@@ -91,6 +94,18 @@ export const ConexaoView: React.FC = () => {
   const [novoJaParticipaCelula, setNovoJaParticipaCelula] = useState(false);
   const [novoPedidoOracao, setNovoPedidoOracao] = useState('');
   const [novoCadastradoPor, setNovoCadastradoPor] = useState('Equipe Conexão');
+
+  // Estados do Modal de Edição de Visitante
+  const [modalEdicaoAberto, setModalEdicaoAberto] = useState(false);
+  const [visitanteParaEditar, setVisitanteParaEditar] = useState<VisitanteConexao | null>(null);
+  const [editNome, setEditNome] = useState('');
+  const [editSexo, setEditSexo] = useState<'Homem' | 'Mulher' | 'Casal'>('Homem');
+  const [editTelefone, setEditTelefone] = useState('');
+  const [editBairro, setEditBairro] = useState('');
+  const [editQuemConvidou, setEditQuemConvidou] = useState('');
+  const [editFaixaEtaria, setEditFaixaEtaria] = useState<VisitanteConexao['faixa_etaria']>('Jovem (18-29)');
+  const [editJaParticipaCelula, setEditJaParticipaCelula] = useState(false);
+  const [editPedidoOracao, setEditPedidoOracao] = useState('');
 
   // Métricas rápidas
   const metricas = useMemo(() => {
@@ -167,6 +182,47 @@ export const ConexaoView: React.FC = () => {
     setModalCadastroAberto(false);
   };
 
+  const handleAbrirEdicao = (v: VisitanteConexao) => {
+    setVisitanteParaEditar(v);
+    setEditNome(v.nome);
+    setEditSexo(v.sexo || 'Homem');
+    setEditTelefone(v.telefone);
+    setEditBairro(v.bairro || '');
+    setEditQuemConvidou(v.quem_convidou || '');
+    setEditFaixaEtaria(v.faixa_etaria || 'Jovem (18-29)');
+    setEditJaParticipaCelula(!!v.ja_participa_celula);
+    setEditPedidoOracao(v.pedido_oracao || '');
+    setModalEdicaoAberto(true);
+  };
+
+  const handleSalvarEdicao = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!visitanteParaEditar) return;
+
+    if (!editNome.trim()) {
+      info('Informe o nome da pessoa.');
+      return;
+    }
+
+    const dadosAtualizados: Partial<VisitanteConexao> = {
+      nome: editNome.trim(),
+      sexo: editSexo,
+      telefone: editTelefone.trim(),
+      bairro: editBairro.trim() || 'Não informado',
+      quem_convidou: editQuemConvidou.trim() || 'Culto de Domingo',
+      faixa_etaria: editFaixaEtaria,
+      ja_participa_celula: editJaParticipaCelula,
+      quer_celula: !editJaParticipaCelula,
+      pedido_oracao: editPedidoOracao.trim() || undefined,
+      observacoes: editJaParticipaCelula ? 'Já participa de célula' : 'Ainda não participa de célula',
+    };
+
+    atualizarVisitante(visitanteParaEditar.id, dadosAtualizados);
+    sucesso(`Cadastro de ${editNome.trim()} atualizado com sucesso!`);
+    setModalEdicaoAberto(false);
+    setVisitanteParaEditar(null);
+  };
+
   // Enviar mensagem de boas-vindas no WhatsApp
   const handleEnviarMensagemWhatsApp = (v: VisitanteConexao) => {
     const apenasDigitos = v.telefone.replace(/\D/g, '');
@@ -224,8 +280,19 @@ export const ConexaoView: React.FC = () => {
             title="Copiar link para o próprio visitante preencher no celular dele"
           >
             <Share2 className="w-4 h-4 mr-2" />
-            <span>Link do Visitante</span>
+            <span>Copiar Link</span>
           </Button>
+
+          <a
+            href="/boas-vindas"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center justify-center px-3.5 py-2.5 rounded-lg border border-[#E4E4E7] bg-[#FAFAFA] hover:bg-[#F4F4F5] text-xs font-bold text-black transition-colors"
+            title="Abrir a Ficha Oficial de Boas-Vindas em nova aba"
+          >
+            <ExternalLink className="w-4 h-4 mr-1.5" />
+            <span>Abrir Ficha ↗</span>
+          </a>
 
           <Button
             variant="primary"
@@ -469,6 +536,16 @@ export const ConexaoView: React.FC = () => {
 
                     <button
                       type="button"
+                      onClick={() => handleAbrirEdicao(v)}
+                      className="p-2 text-[#71717A] hover:text-[#0A0A0A] hover:bg-[#F4F4F5] rounded-lg transition-colors cursor-pointer"
+                      title="Editar cadastro do visitante"
+                      aria-label="Editar visitante"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      type="button"
                       onClick={() => removerVisitante(v.id)}
                       className="p-2 text-[#A1A1AA] hover:text-[#EF4444] rounded-lg transition-colors cursor-pointer"
                       title="Excluir cadastro"
@@ -649,6 +726,163 @@ export const ConexaoView: React.FC = () => {
                 </Button>
                 <Button type="submit" variant="primary">
                   Salvar Visitante
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* MODAL DE EDIÇÃO DE VISITANTE // ATUALIZAR DADOS */}
+      {/* ==================================================== */}
+      {modalEdicaoAberto && visitanteParaEditar && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg bg-white rounded-[var(--radius-box,0.75rem)] border border-[#E4E4E7] shadow-modal overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="p-5 border-b border-[#E4E4E7] flex items-center justify-between bg-[#FAFAFA]">
+              <div className="flex items-center space-x-2">
+                <span className="p-1 rounded bg-[#0A0A0A] text-[var(--accent,#FACC15)]">
+                  <Edit2 className="w-4 h-4" />
+                </span>
+                <h3 className="font-extrabold text-base text-[#0A0A0A]">
+                  Atualizar Dados do Visitante
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalEdicaoAberto(false)}
+                className="text-[#71717A] hover:text-black font-bold text-lg cursor-pointer px-2"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={handleSalvarEdicao}
+              className="p-5 overflow-y-auto space-y-4 text-left flex-1"
+            >
+              <Input
+                label="Nome do Visitante"
+                required
+                value={editNome}
+                onChange={(e) => setEditNome(e.target.value)}
+              />
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-tight text-[#0A0A0A] mb-1.5">
+                  Gênero / Rede
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['Homem', 'Mulher', 'Casal'] as const).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setEditSexo(s)}
+                      className={`h-11 rounded-lg border text-xs font-extrabold flex items-center justify-center space-x-1.5 transition-all cursor-pointer ${
+                        editSexo === s
+                          ? 'bg-black text-[var(--accent,#FACC15)] border-black shadow-sm'
+                          : 'bg-[#FAFAFA] text-[#71717A] border-[#E4E4E7] hover:border-black'
+                      }`}
+                    >
+                      <span>{s === 'Homem' ? '👨 Homem' : s === 'Mulher' ? '👩 Mulher' : '👫 Casal'}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <Input
+                label="WhatsApp"
+                required
+                type="tel"
+                value={editTelefone}
+                onChange={(e) => setEditTelefone(e.target.value)}
+              />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input
+                  label="Bairro"
+                  value={editBairro}
+                  onChange={(e) => setEditBairro(e.target.value)}
+                />
+
+                <Input
+                  label="Quem Convidou"
+                  value={editQuemConvidou}
+                  onChange={(e) => setEditQuemConvidou(e.target.value)}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-tight text-[#0A0A0A] mb-1.5">
+                    Faixa Etária
+                  </label>
+                  <select
+                    value={editFaixaEtaria}
+                    onChange={(e) => setEditFaixaEtaria(e.target.value as any)}
+                    className="w-full h-12 px-3 rounded-lg bg-white border border-[#E4E4E7] text-sm text-[#0A0A0A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black"
+                  >
+                    <option value="Criança">Criança (Eira Kids)</option>
+                    <option value="Adolescente (12-17)">Adolescente (12-17 // Hype)</option>
+                    <option value="Jovem (18-29)">Jovem (18-29 // One Way)</option>
+                    <option value="Adulto">Adulto</option>
+                    <option value="Melhor Idade">Melhor Idade</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-tight text-[#0A0A0A] mb-1.5">
+                    Você já participa de uma célula?
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 h-12">
+                    <button
+                      type="button"
+                      onClick={() => setEditJaParticipaCelula(false)}
+                      className={`px-3 rounded-lg border text-xs font-bold flex items-center justify-center transition-all cursor-pointer ${
+                        !editJaParticipaCelula
+                          ? 'bg-black text-[var(--accent,#FACC15)] border-black shadow-xs'
+                          : 'bg-[#FAFAFA] text-[#71717A] border-[#E4E4E7] hover:border-black'
+                      }`}
+                    >
+                      Ainda não
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditJaParticipaCelula(true)}
+                      className={`px-3 rounded-lg border text-xs font-bold flex items-center justify-center transition-all cursor-pointer ${
+                        editJaParticipaCelula
+                          ? 'bg-black text-[var(--accent,#FACC15)] border-black shadow-xs'
+                          : 'bg-[#FAFAFA] text-[#71717A] border-[#E4E4E7] hover:border-black'
+                      }`}
+                    >
+                      Sim, já participo
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-tight text-[#0A0A0A] mb-1.5">
+                  Pedido de Oração ou Observação
+                </label>
+                <textarea
+                  rows={2}
+                  value={editPedidoOracao}
+                  onChange={(e) => setEditPedidoOracao(e.target.value)}
+                  className="w-full p-3 rounded-lg bg-white border border-[#E4E4E7] text-sm text-[#0A0A0A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-[#E4E4E7] flex items-center justify-end space-x-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setModalEdicaoAberto(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" variant="primary">
+                  Atualizar Informações
                 </Button>
               </div>
             </form>

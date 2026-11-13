@@ -137,6 +137,7 @@ interface AdminStore {
     id: string,
     novoStatus: 'novo' | 'em_contato' | 'integrado'
   ) => void;
+  atualizarVisitante: (id: string, dados: Partial<VisitanteConexao>) => void;
   removerVisitante: (id: string) => void;
 
   // Módulo Células
@@ -329,6 +330,17 @@ export const useAdminStore = create<AdminStore>((set, get) => ({
       return { valido: true, role: 'lider_12', nome: 'Liderança de Rede (12)' };
     }
 
+    // 4. Equipe Conexão (Recepção & Acolhimento de Visitantes)
+    if (
+      (u === 'conexao' ||
+        u === 'equipeconexao' ||
+        u === 'acolhimento' ||
+        u === 'recepcao') &&
+      s === 'eira@1212'
+    ) {
+      return { valido: true, role: 'conexao', nome: 'Equipe Conexão' };
+    }
+
     // 4. Líderes de Célula e Líderes de 12 Cadastrados Localmente
     const state = useAdminStore.getState();
     const liderEncontrado = state.lideres.find(
@@ -459,6 +471,19 @@ export const useAdminStore = create<AdminStore>((set, get) => ({
     set((state) => {
       const novaLista = state.visitantes.map((v) =>
         v.id === id ? { ...v, status: novoStatus } : v
+      );
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('eira_visitantes', JSON.stringify(novaLista));
+        } catch {}
+      }
+      return { visitantes: novaLista };
+    }),
+
+  atualizarVisitante: (id, dados) =>
+    set((state) => {
+      const novaLista = state.visitantes.map((v) =>
+        v.id === id ? { ...v, ...dados } : v
       );
       if (typeof window !== 'undefined') {
         try {
@@ -619,6 +644,8 @@ export const useAdminStore = create<AdminStore>((set, get) => ({
         ? 'Líder de 12 (Rede)'
         : dados.novaFuncao === 'lider_celula'
         ? 'Líder de Célula'
+        : dados.novaFuncao === 'conexao'
+        ? 'Equipe Conexão'
         : dados.novaFuncao === 'pastor'
         ? 'Pastor da Igreja'
         : dados.novaFuncao === 'admin'

@@ -19,7 +19,7 @@ export type FonteOpcao =
 
 export type ModoCor = 'light' | 'dark';
 
-export type UsuarioRole = 'admin' | 'pastor' | 'lider_12' | 'lider_celula' | 'lider';
+export type UsuarioRole = 'admin' | 'pastor' | 'lider_12' | 'lider_celula' | 'lider' | 'conexao';
 
 export interface HorarioCulto {
   id: string;

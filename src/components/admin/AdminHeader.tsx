@@ -3,7 +3,7 @@
 // src/components/admin/AdminHeader.tsx
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { useAdminStore, AbaAdmin, TemaWhiteLabel, UsuarioRole } from '../../store/adminStore';
+import { useAdminStore, AbaAdmin, UsuarioRole } from '../../store/adminStore';
 import { Button } from '../ui/Button';
 import {
   LogOut,
@@ -11,7 +11,6 @@ import {
   Users,
   PlusCircle,
   Church,
-  Palette,
   HeartHandshake,
   Settings,
   Home,
@@ -41,8 +40,6 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
   const {
     abaAtiva,
     setAbaAtiva,
-    temaAtivo,
-    setTemaAtivo,
     usuarioRole,
     setUsuarioRole,
     igrejaConfig,
@@ -154,20 +151,19 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
     marcarAtividadesLideresLidas();
   };
 
-  const temas: { id: TemaWhiteLabel; nome: string; cor: string }[] = [
-    { id: 'eira-signature', nome: 'Eira Amarelo', cor: '#FACC15' },
-    { id: 'solar-amber', nome: 'Solar Âmbar', cor: '#F59E0B' },
-    { id: 'royal-cobalt', nome: 'Royal Cobalto', cor: '#2563EB' },
-    { id: 'emerald-life', nome: 'Emerald Verde', cor: '#10B981' },
-    { id: 'monochrome', nome: 'Monochrome', cor: '#18181B' },
-  ];
-
+  const isConexao = usuarioRole === 'conexao';
   const isLiderCelula = usuarioRole === 'lider_celula' || usuarioRole === 'lider';
   const isLider12 = usuarioRole === 'lider_12';
   const isDiretoria = usuarioRole === 'pastor' || usuarioRole === 'admin';
 
   // Configuração estrita de abas por perfil
   const todasAbas = useMemo(() => {
+    if (isConexao) {
+      return [
+        { id: 'conexao' as AbaAdmin, label: 'Conexão // Visitantes', icon: HeartHandshake },
+      ];
+    }
+
     if (isLiderCelula) {
       return [
         { id: 'dashboard' as AbaAdmin, label: 'Painel da Célula', icon: Church },
@@ -182,8 +178,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
         { id: 'conexao' as AbaAdmin, label: 'Conexão // Visitantes', icon: HeartHandshake },
         { id: 'celulas' as AbaAdmin, label: 'Rede de Células', icon: Home },
         { id: 'inscricoes' as AbaAdmin, label: 'Gestão de Inscrições', icon: Users },
-        { id: 'eventos' as AbaAdmin, label: 'Gerenciar Eventos', icon: Calendar },
-        { id: 'novo-evento' as AbaAdmin, label: '+ Novo Evento', icon: PlusCircle },
+        { id: 'eventos' as AbaAdmin, label: 'Eventos Oficiais', icon: Calendar },
       ];
     }
 
@@ -197,7 +192,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
       { id: 'novo-evento' as AbaAdmin, label: '+ Novo Evento', icon: PlusCircle },
       { id: 'configuracao' as AbaAdmin, label: 'Configuração da Igreja', icon: Settings },
     ];
-  }, [isLiderCelula, isLider12, isDiretoria]);
+  }, [isConexao, isLiderCelula, isLider12, isDiretoria]);
 
   return (
     <header className="w-full bg-white border-b border-[#E4E4E7] sticky top-0 z-40 transition-colors">
@@ -366,6 +361,8 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                 ? 'Perfil: ADM'
                 : usuarioRole === 'lider_12'
                 ? 'Perfil: Líder de Rede (12)'
+                : usuarioRole === 'conexao'
+                ? 'Perfil: Equipe Conexão'
                 : 'Perfil: Líder de Célula'}
             </span>
           </div>
@@ -385,25 +382,6 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
             )}
           </button>
 
-          {/* Seletor Rápido de Paleta White Label */}
-          <div className="hidden sm:flex items-center space-x-1.5 p-1 rounded-lg bg-[#F4F4F5] border border-[#E4E4E7]">
-            <Palette className="w-3.5 h-3.5 text-[#71717A] ml-1.5 mr-1" aria-hidden="true" />
-            {temas.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setTemaAtivo(t.id)}
-                title={`Mudar tema para ${t.nome}`}
-                className={`w-5 h-5 rounded-full transition-transform cursor-pointer ${
-                  temaAtivo === t.id
-                    ? 'ring-2 ring-black scale-110'
-                    : 'opacity-70 hover:opacity-100'
-                }`}
-                style={{ backgroundColor: t.cor }}
-                aria-label={`Tema ${t.nome}`}
-              />
-            ))}
-          </div>
-
           {onLogout && (
             <Button
               variant="ghost"
@@ -418,9 +396,9 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
         </div>
       </div>
 
-      {/* Navegação de Abas */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex overflow-x-auto no-scrollbar border-t border-[#F4F4F5]">
-        <nav aria-label="Abas do painel" className="flex space-x-1 py-1">
+      {/* Navegação de Abas com Espaçamento Amigável no Mobile */}
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 flex overflow-x-auto no-scrollbar border-t border-[#F4F4F5]">
+        <nav aria-label="Abas do painel" className="flex space-x-1.5 py-2 sm:py-2.5">
           {todasAbas.map((item) => {
             const isAtiva = abaAtiva === item.id;
             const Icon = item.icon;
@@ -428,7 +406,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
               <button
                 key={item.id}
                 onClick={() => setAbaAtiva(item.id)}
-                className={`flex items-center space-x-2 px-3.5 py-2.5 text-xs font-bold rounded-[var(--radius-btn,0.5rem)] transition-colors whitespace-nowrap cursor-pointer ${
+                className={`flex items-center space-x-2 px-3.5 py-2 text-xs font-bold rounded-[var(--radius-btn,0.5rem)] transition-colors whitespace-nowrap cursor-pointer shrink-0 ${
                   isAtiva
                     ? 'bg-[#0A0A0A] text-white shadow-sm'
                     : 'text-[#71717A] hover:text-[#0A0A0A] hover:bg-[#F4F4F5]'

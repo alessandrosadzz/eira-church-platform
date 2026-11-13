@@ -109,7 +109,7 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
   const [inscricoes, setInscricoes] = useState<Inscricao[]>([]);
   const [carregandoInscricoes, setCarregandoInscricoes] = useState(false);
   const [filtroTipoPessoa, setFiltroTipoPessoa] = useState<
-    'todos' | 'lider_12' | 'lider_celula' | 'pastor_admin' | 'membro' | 'visitante' | 'inscrito'
+    'todos' | 'lider_12' | 'lider_celula' | 'pastor_admin' | 'conexao' | 'membro' | 'visitante' | 'inscrito'
   >('todos');
   const [buscaPessoas, setBuscaPessoas] = useState('');
   const [limiteExibicao, setLimiteExibicao] = useState(30);
@@ -344,6 +344,10 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
     () => listaConsolidada.filter((p) => p.subRole === 'pastor' || p.subRole === 'admin').length,
     [listaConsolidada]
   );
+  const totalConexao = useMemo(
+    () => listaConsolidada.filter((p) => p.subRole === 'conexao').length,
+    [listaConsolidada]
+  );
   const totalMembros = useMemo(
     () => listaConsolidada.filter((p) => p.categoria === 'membro').length,
     [listaConsolidada]
@@ -363,6 +367,7 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
     return listaConsolidada.filter((p) => {
       if (filtroTipoPessoa === 'lider_12' && p.subRole !== 'lider_12') return false;
       if (filtroTipoPessoa === 'lider_celula' && p.subRole !== 'lider_celula') return false;
+      if (filtroTipoPessoa === 'conexao' && p.subRole !== 'conexao') return false;
       if (filtroTipoPessoa === 'pastor_admin' && p.subRole !== 'pastor' && p.subRole !== 'admin')
         return false;
       if (filtroTipoPessoa === 'membro' && p.categoria !== 'membro') return false;
@@ -437,6 +442,8 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
           ? 'Líder de 12 (Rede)'
           : novaFuncaoSelecionada === 'lider_celula'
           ? 'Líder de Célula'
+          : novaFuncaoSelecionada === 'conexao'
+          ? 'Equipe Conexão'
           : novaFuncaoSelecionada === 'pastor'
           ? 'Pastor da Igreja'
           : novaFuncaoSelecionada === 'admin'
@@ -980,6 +987,17 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
                 }`}
               >
                 ✝️ Pastores & ADM ({totalPastoresAdmin})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFiltroTipoPessoa('conexao')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  filtroTipoPessoa === 'conexao'
+                    ? 'bg-sky-600 text-white shadow-xs'
+                    : 'bg-[#F4F4F5] text-[#52525B] hover:bg-[#E4E4E7]'
+                }`}
+              >
+                🤝 Conexão ({totalConexao})
               </button>
               <button
                 type="button"
@@ -1765,6 +1783,38 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
                       </div>
                       <p className="text-[11px] text-[#71717A] mt-1 leading-relaxed">
                         Responsável direto pela sua célula. Atualiza informações do grupo, gerencia membros e batismos, e acolhe pessoas novas do seu bairro.
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* Opção 3: Equipe Conexão // Acolhimento */}
+                  <label
+                    className={`p-3.5 rounded-xl border flex items-start space-x-3 cursor-pointer transition-all ${
+                      novaFuncaoSelecionada === 'conexao'
+                        ? 'border-sky-500 bg-sky-50/70 ring-2 ring-sky-500 shadow-xs'
+                        : 'border-[#E4E4E7] hover:border-black bg-white'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="funcao"
+                      value="conexao"
+                      checked={novaFuncaoSelecionada === 'conexao'}
+                      onChange={() => setNovaFuncaoSelecionada('conexao')}
+                      className="mt-1 accent-sky-600"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center space-x-2">
+                        <HeartHandshake className="w-4 h-4 text-sky-600 flex-shrink-0" />
+                        <span className="text-xs font-black text-[#0A0A0A]">
+                          Equipe Conexão
+                        </span>
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-sky-100 text-sky-950">
+                          Acolhimento & Visitantes
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#71717A] mt-1 leading-relaxed">
+                        Acesso exclusivo ao módulo Conexão: compartilhar link da recepção, cadastrar pessoas novas no culto, atualizar status de acolhimento e buscar visitantes.
                       </p>
                     </div>
                   </label>

@@ -1072,7 +1072,7 @@ export const CelulasView: React.FC = () => {
                     type="button"
                     onClick={() => {
                       const origin = typeof window !== 'undefined' ? window.location.origin : '';
-                      const url = `${origin}/cadastro-lider?tipo=lider_celula&por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`;
+                      const url = `${origin}/cadastro-lider-celula?por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`;
                       navigator.clipboard.writeText(url);
                       sucesso('Link de convite para Líder de Célula copiado!');
                     }}
@@ -1086,7 +1086,7 @@ export const CelulasView: React.FC = () => {
                     href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
                       `Graça e paz! Segue o link oficial para você cadastrar a sua célula e ativar seu login de Líder na Eira Church: ${
                         typeof window !== 'undefined' ? window.location.origin : ''
-                      }/cadastro-lider?tipo=lider_celula&por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`
+                      }/cadastro-lider-celula?por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`
                     )}`}
                     target="_blank"
                     rel="noreferrer"
@@ -1117,7 +1117,7 @@ export const CelulasView: React.FC = () => {
                     type="button"
                     onClick={() => {
                       const origin = typeof window !== 'undefined' ? window.location.origin : '';
-                      const url = `${origin}/cadastro-lider?tipo=lider_12&por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`;
+                      const url = `${origin}/cadastro-lider-12?por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`;
                       navigator.clipboard.writeText(url);
                       sucesso('Link de convite para Líder de 12 copiado!');
                     }}
@@ -1131,7 +1131,7 @@ export const CelulasView: React.FC = () => {
                     href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
                       `Graça e paz! Segue o link oficial para você cadastrar seu acesso como Líder de 12 na Eira Church: ${
                         typeof window !== 'undefined' ? window.location.origin : ''
-                      }/cadastro-lider?tipo=lider_12&por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`
+                      }/cadastro-lider-12?por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`
                     )}`}
                     target="_blank"
                     rel="noreferrer"

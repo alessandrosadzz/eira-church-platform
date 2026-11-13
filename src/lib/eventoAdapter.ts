@@ -766,7 +766,7 @@ export async function atualizarFuncaoLiderSupabase(dados: {
   pessoaNome: string;
   telefone?: string | null;
   email?: string | null;
-  novaFuncao: 'admin' | 'pastor' | 'lider_12' | 'lider_celula' | 'lider' | 'membro';
+  novaFuncao: 'admin' | 'pastor' | 'lider_12' | 'lider_celula' | 'lider' | 'conexao' | 'membro';
   celulaId?: string;
   rede?: string;
   celulaNome?: string;
