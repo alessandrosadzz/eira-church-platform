@@ -20,6 +20,7 @@ export interface Inscricao {
   rede_participante?: string | null;
   igreja?: string | null;
   transporte?: boolean;
+  endereco?: string | null;
   observacoes_saude?: string | null;
   participa_celula?: boolean;
   nome_celula_lider?: string | null;

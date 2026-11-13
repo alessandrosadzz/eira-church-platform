@@ -31,43 +31,71 @@ function garantirUUID(id?: string): string {
 }
 
 /**
- * Busca todos os eventos cadastrados no Supabase, mesclando com o cache local.
+ * Busca todos os eventos cadastrados no Supabase, mesclando com o cache local e contagem real de inscritos.
  */
 export async function buscarEventosSupabase(): Promise<Evento[]> {
   try {
-    const { data, error } = await supabase
-      .from('eventos')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const [{ data, error }, { data: todasInscricoes }] = await Promise.all([
+      supabase
+        .from('eventos')
+        .select('*')
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('inscricoes')
+        .select('id, evento_id, status, valor_pago'),
+    ]);
 
     if (error) {
       console.warn('Erro ao buscar eventos do Supabase:', error.message);
       return carregarEventosLocal();
     }
 
+    // Mapa de contagens por evento
+    const contagemInscritos: Record<string, number> = {};
+    const contagemConfirmados: Record<string, number> = {};
+    const receitaMap: Record<string, number> = {};
+
+    (todasInscricoes || []).forEach((i: any) => {
+      const evId = i.evento_id;
+      if (evId) {
+        contagemInscritos[evId] = (contagemInscritos[evId] || 0) + 1;
+        if (i.status === 'pago' || i.status === 'isento') {
+          contagemConfirmados[evId] = (contagemConfirmados[evId] || 0) + 1;
+          receitaMap[evId] = (receitaMap[evId] || 0) + Number(i.valor_pago || 0);
+        }
+      }
+    });
+
     if (data && data.length > 0) {
-      const mapeados: Evento[] = data.map((row: any) => ({
-        id: row.id,
-        nome: row.nome,
-        slug: row.slug,
-        descricao: row.descricao || '',
-        data_inicio: row.data_inicio,
-        data_fim: row.data_fim,
-        local_nome: row.local || 'Eira Church',
-        valor: Number(row.preco || 0),
-        vagas: Number(row.limite_vagas || 100),
-        imagem_url: row.imagem_url || undefined,
-        ativo: row.ativo !== false,
-        categoria: (row.categoria as CategoriaEvento) || 'Outro',
-        rede: 'Padrão',
-        campos: ['nome', 'telefone', 'email', 'nascimento'],
-        total_inscritos: 0,
-        inscritos_confirmados: 0,
-        vagas_restantes: Number(row.limite_vagas || 100),
-        receita_confirmada: 0,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-      }));
+      const mapeados: Evento[] = data.map((row: any) => {
+        const vagas = Number(row.limite_vagas || 100);
+        const totalInscritos = contagemInscritos[row.id] || 0;
+        const confirmados = contagemConfirmados[row.id] || 0;
+        const vagasRestantes = Math.max(vagas - totalInscritos, 0);
+
+        return {
+          id: row.id,
+          nome: row.nome,
+          slug: row.slug,
+          descricao: row.descricao || '',
+          data_inicio: row.data_inicio,
+          data_fim: row.data_fim,
+          local_nome: row.local || 'Eira Church',
+          valor: Number(row.preco || 0),
+          vagas,
+          imagem_url: row.imagem_url || undefined,
+          ativo: row.ativo !== false,
+          categoria: (row.categoria as CategoriaEvento) || 'Outro',
+          rede: 'Padrão',
+          campos: ['nome', 'telefone', 'email', 'nascimento'],
+          total_inscritos: totalInscritos,
+          inscritos_confirmados: totalInscritos,
+          vagas_restantes: vagasRestantes,
+          receita_confirmada: receitaMap[row.id] || 0,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+        };
+      });
 
       salvarEventosLocal(mapeados);
       return mapeados;
@@ -162,7 +190,23 @@ export function carregarEventosLocal(): Evento[] {
   if (typeof window === 'undefined') return [];
   try {
     const salvos = localStorage.getItem('eira_eventos');
-    return salvos ? JSON.parse(salvos) : [];
+    if (!salvos) return [];
+    const evs: Evento[] = JSON.parse(salvos);
+    const inscs = carregarInscricoesLocal();
+    const contagem: Record<string, number> = {};
+    inscs.forEach((i) => {
+      if (i.evento_id) contagem[i.evento_id] = (contagem[i.evento_id] || 0) + 1;
+    });
+    return evs.map((e) => {
+      const total = contagem[e.id] ?? e.total_inscritos ?? 0;
+      const vagas = e.vagas || 100;
+      return {
+        ...e,
+        total_inscritos: total,
+        inscritos_confirmados: total,
+        vagas_restantes: Math.max(vagas - total, 0),
+      };
+    });
   } catch {
     return [];
   }
@@ -225,6 +269,7 @@ export async function buscarInscricoesSupabase(): Promise<Inscricao[]> {
           telefone_responsavel: extra.resp_tel || extra.telefone_responsavel || row.telefone_responsavel || null,
           email_responsavel: extra.resp_email || extra.email_responsavel || row.email_responsavel || null,
           rede_participante: extra.rede || extra.rede_participante || null,
+          endereco: extra.endereco || null,
           observacoes_saude: extra.saude || extra.observacoes_saude || null,
           participa_celula: extra.participa_celula ?? row.participa_celula,
           nome_celula_lider: extra.celula || extra.nome_celula_lider || null,
@@ -347,6 +392,7 @@ export async function salvarInscricaoSupabase(dados: {
     telefone_responsavel: dados.telefone_responsavel || null,
     email_responsavel: dados.email_responsavel || null,
     rede_participante: dados.rede_participante || null,
+    endereco: dados.endereco || null,
     participa_celula: dados.participa_celula,
     nome_celula_lider: dados.nome_celula_lider || null,
     observacoes_saude: dados.observacoes_saude || null,

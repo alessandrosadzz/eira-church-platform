@@ -10,8 +10,12 @@ import { Calendar, MapPin, Users } from 'lucide-react';
 
 export const EventHero: React.FC<{ evento: Evento }> = ({ evento }) => {
   const vagas = evento.vagas;
-  const inscritos = evento.inscritos_confirmados ?? 0;
+  const inscritos =
+    (evento.total_inscritos && evento.total_inscritos > 0)
+      ? evento.total_inscritos
+      : (evento.inscritos_confirmados ?? 0);
   const vagasRestantes = evento.vagas_restantes ?? Math.max(vagas - inscritos, 0);
+  const porcentagem = Math.min(Math.round((inscritos / (vagas || 1)) * 100), 100);
 
   return (
     <section className="relative w-full bg-[#0A0A0A] text-white pt-16 pb-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
@@ -62,6 +66,7 @@ export const EventHero: React.FC<{ evento: Evento }> = ({ evento }) => {
           <div className="flex items-center space-x-2">
             <Users className="w-4 h-4 text-[var(--accent,#FACC15)]" aria-hidden="true" />
             <span>
+              <strong className="text-white font-bold">{inscritos}</strong> inscritos ({porcentagem}%) •{' '}
               <strong className="text-white font-bold">{vagasRestantes}</strong> vagas restantes
             </span>
           </div>

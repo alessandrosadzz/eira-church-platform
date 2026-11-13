@@ -22,7 +22,10 @@ export const EventCard: React.FC<EventCardProps> = ({
   featured = false,
 }) => {
   const vagas = evento.vagas;
-  const inscritos = evento.inscritos_confirmados ?? 0;
+  const inscritos =
+    (evento.total_inscritos && evento.total_inscritos > 0)
+      ? evento.total_inscritos
+      : (evento.inscritos_confirmados ?? 0);
   const vagasRestantes = evento.vagas_restantes ?? Math.max(vagas - inscritos, 0);
   const esgotado = vagasRestantes <= 0;
 
