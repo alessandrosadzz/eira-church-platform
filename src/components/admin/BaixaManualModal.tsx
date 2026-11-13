@@ -7,7 +7,7 @@ import { Inscricao, MetodoPagamento } from '../../types/inscricao';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { formatarMoeda } from '../../lib/formatters';
-import { CheckCircle2, Banknote, QrCode, CreditCard, Gift } from 'lucide-react';
+import { CheckCircle2, Banknote, QrCode, CreditCard, Gift, ExternalLink, Paperclip } from 'lucide-react';
 
 export interface BaixaManualModalProps {
   inscricao: Inscricao | null;
@@ -55,6 +55,40 @@ export const BaixaManualModal: React.FC<BaixaManualModalProps> = ({
             {formatarMoeda(inscricao.evento?.valor || 0)}
           </p>
         </div>
+
+        {/* Comprovante Anexado pelo Participante */}
+        {inscricao.comprovante_url && (
+          <div className="p-3.5 rounded-xl bg-[#F0FDF4] border border-[#BBF7D0] space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-[#166534] flex items-center">
+                <CheckCircle2 className="w-4 h-4 mr-1.5 text-[#16a34a]" />
+                Comprovante Enviado pelo Participante
+              </span>
+              <a
+                href={inscricao.comprovante_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-bold text-[#15803D] hover:underline flex items-center"
+              >
+                <span>Abrir Completo</span>
+                <ExternalLink className="w-3 h-3 ml-1" />
+              </a>
+            </div>
+            <div className="max-h-52 overflow-hidden rounded-lg border border-[#86EFAC] bg-white flex items-center justify-center p-1">
+              <img
+                src={inscricao.comprovante_url}
+                alt="Comprovante de pagamento"
+                className="max-h-48 w-auto object-contain rounded cursor-pointer hover:opacity-95 transition-opacity"
+                onClick={() => {
+                  window.open(inscricao.comprovante_url || '', '_blank');
+                }}
+              />
+            </div>
+            <p className="text-[10px] text-[#15803D] text-center italic">
+              Dica: Clique no comprovante para ampliar e conferir os dados bancários antes de dar baixa.
+            </p>
+          </div>
+        )}
 
         {/* Escolha: Pagamento ou Isenção */}
         <div className="space-y-2">

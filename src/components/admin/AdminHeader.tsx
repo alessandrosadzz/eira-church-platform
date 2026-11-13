@@ -45,9 +45,12 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
     setModoCor,
     visitantes,
     celulas,
+    atividadesLideres,
+    marcarAtividadesLideresLidas,
   } = useAdminStore();
 
   const [menuNotificacoesAberto, setMenuNotificacoesAberto] = useState(false);
+  const [abaNotifAtiva, setAbaNotifAtiva] = useState<'todas' | 'lideres'>('todas');
   const [notificacoesLidas, setNotificacoesLidas] = useState<string[]>([]);
   const notifRef = useRef<HTMLDivElement>(null);
 
@@ -64,16 +67,32 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
 
   const nomeExibicao = igrejaNome || igrejaConfig.nome || 'Eira Church';
 
-  // Notificações em tempo real calculadas pelo perfil
+  // Notificações gerais calculadas pelo perfil
   const notificacoes = useMemo(() => {
     const lista: {
       id: string;
       titulo: string;
       descricao: string;
-      tipo: 'visitante' | 'inscricao' | 'celula';
+      tipo: 'visitante' | 'inscricao' | 'celula' | 'lider';
       aba: AbaAdmin;
       destaque?: boolean;
+      timestamp?: string;
     }[] = [];
+
+    // Notificações de atividades dos líderes (para Pastores e Admins)
+    if (usuarioRole === 'pastor' || usuarioRole === 'admin') {
+      atividadesLideres.forEach((atv) => {
+        lista.push({
+          id: atv.id,
+          titulo: `📋 ${atv.titulo}`,
+          descricao: atv.descricao,
+          tipo: 'lider',
+          aba: 'celulas',
+          destaque: !atv.lida,
+          timestamp: atv.timestamp,
+        });
+      });
+    }
 
     const novosVisitantes = visitantes.filter((v) => v.status === 'novo');
     if (novosVisitantes.length > 0) {
@@ -104,21 +123,30 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
       lista.push({
         id: 'notif-zerado',
         titulo: 'Tudo em dia!',
-        descricao: 'Novas pessoas cadastradas ou inscrições de eventos aparecerão aqui.',
+        descricao: 'Novas pessoas cadastradas ou atualizações dos líderes aparecerão aqui.',
         tipo: 'visitante',
         aba: 'dashboard',
       });
     }
 
     return lista;
-  }, [visitantes, celulas, usuarioRole]);
+  }, [visitantes, celulas, usuarioRole, atividadesLideres]);
+
+  const notificacoesLideres = useMemo(() => {
+    return notificacoes.filter((n) => n.tipo === 'lider');
+  }, [notificacoes]);
 
   const contagemNaoLidas = notificacoes.filter(
     (n) => !notificacoesLidas.includes(n.id) && n.id !== 'notif-zerado'
   ).length;
 
+  const contagemLideresNaoLidas = notificacoesLideres.filter(
+    (n) => !notificacoesLidas.includes(n.id)
+  ).length;
+
   const marcarTodasLidas = () => {
     setNotificacoesLidas(notificacoes.map((n) => n.id));
+    marcarAtividadesLideresLidas();
   };
 
   const temas: { id: TemaWhiteLabel; nome: string; cor: string }[] = [
@@ -162,8 +190,16 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
       {/* Barra Superior da Marca e Operador */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-[var(--radius-btn,0.5rem)] bg-[#0A0A0A] text-[var(--accent,#FACC15)] flex items-center justify-center font-black text-lg border border-black shadow-sm">
-            {nomeExibicao.charAt(0)}
+          <div className="w-10 h-10 rounded-[var(--radius-btn,0.5rem)] bg-[#0A0A0A] text-[var(--accent,#FACC15)] flex items-center justify-center font-black text-lg border border-black shadow-sm overflow-hidden">
+            {igrejaConfig?.logoUrl ? (
+              <img
+                src={igrejaConfig.logoUrl}
+                alt={nomeExibicao}
+                className="w-full h-full object-contain p-1"
+              />
+            ) : (
+              nomeExibicao.charAt(0)
+            )}
           </div>
           <div>
             <div className="flex items-center space-x-2">
@@ -182,35 +218,33 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
 
         {/* Controles de Lado Direito: Notificações, Perfil Ativo, Dark Mode, Tema e Logout */}
         <div className="flex items-center space-x-2 sm:space-x-3">
-          {/* Central de Notificações com Badge */}
+          {/* Central de Notificações com Badge Discreto */}
           <div className="relative" ref={notifRef}>
             <button
               type="button"
               onClick={() => setMenuNotificacoesAberto(!menuNotificacoesAberto)}
               className="relative p-2 rounded-lg bg-[#F4F4F5] border border-[#E4E4E7] text-[#0A0A0A] hover:border-black transition-colors cursor-pointer"
-              title="Notificações da Liderança"
+              title="Notificações e Atualizações dos Líderes"
               aria-label="Abrir notificações"
             >
               <Bell className="w-4 h-4 text-[#0A0A0A]" />
               {contagemNaoLidas > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-600 text-white font-black text-[10px] flex items-center justify-center shadow-sm animate-pulse">
-                  {contagemNaoLidas}
-                </span>
+                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[var(--accent,#FACC15)] ring-1.5 ring-white" />
               )}
             </button>
 
             {/* Menu Dropdown de Notificações */}
             {menuNotificacoesAberto && (
-              <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-[var(--radius-box,0.75rem)] border border-[#E4E4E7] shadow-xl z-50 overflow-hidden text-left">
+              <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-[var(--radius-box,0.75rem)] border border-[#E4E4E7] shadow-xl z-50 overflow-hidden text-left animate-fadeIn">
                 <div className="p-3.5 border-b border-[#F4F4F5] flex items-center justify-between bg-[#FAFAFA]">
                   <div className="flex items-center space-x-2">
                     <Bell className="w-4 h-4 text-black" />
                     <span className="font-extrabold text-xs text-[#0A0A0A]">
-                      Notificações & Atividades
+                      Atualizações & Notificações
                     </span>
                     {contagemNaoLidas > 0 && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-rose-100 text-rose-700">
-                        {contagemNaoLidas} novas
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#FEF08A] text-[#854D0E]">
+                        {contagemNaoLidas} pendentes
                       </span>
                     )}
                   </div>
@@ -224,8 +258,39 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                   )}
                 </div>
 
+                {/* Abas Internas para Pastores e Admins */}
+                {(usuarioRole === 'pastor' || usuarioRole === 'admin') && (
+                  <div className="grid grid-cols-2 p-1.5 bg-[#F4F4F5] border-b border-[#E4E4E7] text-xs font-bold gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setAbaNotifAtiva('todas')}
+                      className={`py-1.5 rounded-md transition-colors ${
+                        abaNotifAtiva === 'todas'
+                          ? 'bg-white text-black shadow-xs font-extrabold'
+                          : 'text-[#71717A] hover:text-black'
+                      }`}
+                    >
+                      Todas as Notificações
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAbaNotifAtiva('lideres')}
+                      className={`py-1.5 rounded-md transition-colors flex items-center justify-center space-x-1 ${
+                        abaNotifAtiva === 'lideres'
+                          ? 'bg-white text-black shadow-xs font-extrabold'
+                          : 'text-[#71717A] hover:text-black'
+                      }`}
+                    >
+                      <span>Relatório Líderes</span>
+                      {contagemLideresNaoLidas > 0 && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent,#FACC15)]" />
+                      )}
+                    </button>
+                  </div>
+                )}
+
                 <div className="max-h-80 overflow-y-auto divide-y divide-[#F4F4F5]">
-                  {notificacoes.map((item) => (
+                  {(abaNotifAtiva === 'lideres' ? notificacoesLideres : notificacoes).map((item) => (
                     <div
                       key={item.id}
                       onClick={() => {
@@ -233,7 +298,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                         setMenuNotificacoesAberto(false);
                       }}
                       className={`p-3.5 hover:bg-[#FAFAFA] transition-colors cursor-pointer space-y-1 ${
-                        item.destaque ? 'bg-[#FEF08A]/15' : ''
+                        item.destaque ? 'bg-[#FEF9C3]/20' : ''
                       }`}
                     >
                       <div className="flex items-center justify-between">
@@ -250,6 +315,11 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                       </p>
                     </div>
                   ))}
+                  {abaNotifAtiva === 'lideres' && notificacoesLideres.length === 0 && (
+                    <div className="p-6 text-center text-xs text-[#71717A]">
+                      Nenhuma atualização recente da liderança no momento.
+                    </div>
+                  )}
                 </div>
               </div>
             )}

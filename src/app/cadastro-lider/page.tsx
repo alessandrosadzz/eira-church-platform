@@ -173,8 +173,16 @@ export default function CadastroLiderPage() {
             <span>Página Inicial</span>
           </Link>
           <div className="flex items-center space-x-2">
-            <div className="w-6 h-6 rounded bg-[#0A0A0A] text-[var(--accent,#FACC15)] flex items-center justify-center font-black text-xs">
-              {igrejaConfig.nome.charAt(0)}
+            <div className="w-7 h-7 rounded bg-[#0A0A0A] text-[var(--accent,#FACC15)] flex items-center justify-center font-black text-xs overflow-hidden">
+              {igrejaConfig?.logoUrl ? (
+                <img
+                  src={igrejaConfig.logoUrl}
+                  alt={igrejaConfig.nome}
+                  className="w-full h-full object-contain p-0.5"
+                />
+              ) : (
+                igrejaConfig.nome.charAt(0)
+              )}
             </div>
             <span className="text-xs font-bold text-[#0A0A0A]">
               {igrejaConfig.nome} // Liderança

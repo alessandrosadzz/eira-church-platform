@@ -26,6 +26,7 @@ export interface Inscricao {
   mp_payment_id?: string | null;
   mp_preference_id?: string | null;
   comprovante_hash?: string;
+  comprovante_url?: string | null;
   created_at: string;
   updated_at?: string;
   evento?: Pick<Evento, 'nome' | 'categoria' | 'rede' | 'valor'>;

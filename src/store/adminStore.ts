@@ -68,6 +68,11 @@ const IGREJA_CONFIG_PADRAO: IgrejaConfig = {
   whatsapp: '',
   instagram: '',
   email: '',
+  chavePix: 'eirajoinville@hotmail.com',
+  titularPix: 'Eira Church Joinville',
+  cidadePix: 'Joinville',
+  copiaEColaPix: '00020126470014BR.GOV.BCB.PIX0125eirajoinville@hotmail.com5204000053039865802BR5921Eira Church Joinville6009Joinville62140510EIRACHURCH630461FC',
+  qrCodePixUrl: '/pix-qrcode.png',
 };
 
 const SEED_VISITANTES: VisitanteConexao[] = [];
@@ -137,6 +142,24 @@ interface AdminStore {
   ) => void;
   removerMembroCelula: (celulaId: string, membroId: string) => void;
   toggleBatismoMembro: (celulaId: string, membroId: string) => void;
+
+  // Notificações & Relatório de Atividades dos Líderes (Para Pastores e Admins)
+  atividadesLideres: AtividadeLider[];
+  registrarAtividadeLider: (
+    atv: Omit<AtividadeLider, 'id' | 'timestamp' | 'lida'>
+  ) => void;
+  marcarAtividadesLideresLidas: () => void;
+}
+
+export interface AtividadeLider {
+  id: string;
+  tipo: 'novo_lider' | 'membro_editado' | 'novo_membro' | 'celula_atualizada';
+  liderNome: string;
+  titulo: string;
+  descricao: string;
+  detalhe?: string;
+  timestamp: string;
+  lida?: boolean;
 }
 
 const FILTROS_INICIAIS: FiltrosInscricao = {
@@ -194,12 +217,26 @@ export const useAdminStore = create<AdminStore>((set) => ({
         criadoEm: new Date().toISOString(),
       };
       const listaAtualizada = [novoLider, ...state.lideres];
+
+      const novaAtv: AtividadeLider = {
+        id: `atv-${Date.now()}`,
+        tipo: 'novo_lider',
+        liderNome: dados.nome,
+        titulo: 'Novo Líder Cadastrado',
+        descricao: `${dados.nome} cadastrou acesso para a célula "${dados.celulaNome}" (${dados.rede}).`,
+        detalhe: `Usuário: ${dados.usuarioOuEmail} • WhatsApp: ${dados.telefone}`,
+        timestamp: new Date().toISOString(),
+        lida: false,
+      };
+      const novasAtividades = [novaAtv, ...state.atividadesLideres].slice(0, 50);
+
       if (typeof window !== 'undefined') {
         try {
           localStorage.setItem('eira_lideres', JSON.stringify(listaAtualizada));
+          localStorage.setItem('eira_atividades_lideres', JSON.stringify(novasAtividades));
         } catch {}
       }
-      return { lideres: listaAtualizada };
+      return { lideres: listaAtualizada, atividadesLideres: novasAtividades };
     }),
 
   validarLogin: (usuarioOuEmail, senha) => {
@@ -411,6 +448,7 @@ export const useAdminStore = create<AdminStore>((set) => ({
 
   editarMembroCelula: (celulaId, membroId, dados) =>
     set((state) => {
+      const celulaAtual = state.celulas.find((c) => c.id === celulaId);
       const novaLista = state.celulas.map((c) => {
         if (c.id !== celulaId) return c;
         return {
@@ -420,12 +458,25 @@ export const useAdminStore = create<AdminStore>((set) => ({
           ),
         };
       });
+
+      const novaAtv: AtividadeLider = {
+        id: `atv-${Date.now()}`,
+        tipo: 'membro_editado',
+        liderNome: celulaAtual?.lider_nome || 'Líder',
+        titulo: 'Atualização em Célula',
+        descricao: `Líder ${celulaAtual?.lider_nome || ''} atualizou dados de membro na célula "${celulaAtual?.nome || ''}".`,
+        timestamp: new Date().toISOString(),
+        lida: false,
+      };
+      const novasAtividades = [novaAtv, ...state.atividadesLideres].slice(0, 50);
+
       if (typeof window !== 'undefined') {
         try {
           localStorage.setItem('eira_celulas', JSON.stringify(novaLista));
+          localStorage.setItem('eira_atividades_lideres', JSON.stringify(novasAtividades));
         } catch {}
       }
-      return { celulas: novaLista };
+      return { celulas: novaLista, atividadesLideres: novasAtividades };
     }),
 
   removerMembroCelula: (celulaId, membroId) =>
@@ -462,5 +513,35 @@ export const useAdminStore = create<AdminStore>((set) => ({
         } catch {}
       }
       return { celulas: novaLista };
+    }),
+
+  atividadesLideres: obterListaArmazenada<AtividadeLider>('eira_atividades_lideres', []),
+
+  registrarAtividadeLider: (atv) =>
+    set((state) => {
+      const nova: AtividadeLider = {
+        ...atv,
+        id: `atv-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        timestamp: new Date().toISOString(),
+        lida: false,
+      };
+      const lista = [nova, ...state.atividadesLideres].slice(0, 50);
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('eira_atividades_lideres', JSON.stringify(lista));
+        } catch {}
+      }
+      return { atividadesLideres: lista };
+    }),
+
+  marcarAtividadesLideresLidas: () =>
+    set((state) => {
+      const lista = state.atividadesLideres.map((a) => ({ ...a, lida: true }));
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('eira_atividades_lideres', JSON.stringify(lista));
+        } catch {}
+      }
+      return { atividadesLideres: lista };
     }),
 }));

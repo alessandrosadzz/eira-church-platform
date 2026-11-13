@@ -18,6 +18,13 @@ import { Inscricao, MetodoPagamento } from '../../types/inscricao';
 import { SEED_EVENTOS, SEED_INSCRICOES, supabase } from '../../lib/supabase';
 import { formatarMoeda, formatarDataCurta } from '../../lib/formatters';
 import { exportarCsvInscricoes } from '../../lib/exportCsv';
+import { executarLimpezaComprovantesAntigos } from '../../lib/retencaoComprovantes';
+import {
+  buscarEventosSupabase,
+  salvarEventoSupabase,
+  buscarInscricoesSupabase,
+  atualizarStatusInscricaoSupabase,
+} from '../../lib/eventoAdapter';
 import { useToast } from '../../hooks/useToast';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
@@ -39,6 +46,7 @@ import {
   Eye,
   EyeOff,
   ShieldCheck,
+  Trash2,
   LogIn,
   Sparkles,
   TrendingUp,
@@ -154,36 +162,22 @@ export default function AdminPage() {
   // Modal Central de Atualizações e Novidades da Plataforma
   const [modalAtualizacoesAberto, setModalAtualizacoesAberto] = useState(false);
 
-  // Carrega Eventos do LocalStorage e do Supabase
+  // Carrega Eventos e Inscrições sincronizados com o Supabase e LocalStorage
+  const carregarDadosGerais = async () => {
+    try {
+      const [evs, inscs] = await Promise.all([
+        buscarEventosSupabase(),
+        buscarInscricoesSupabase(),
+      ]);
+      if (evs && evs.length > 0) setEventos(evs);
+      if (inscs) setInscricoes(inscs);
+    } catch (e) {
+      console.warn('Erro ao carregar dados:', e);
+    }
+  };
+
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const salvos = localStorage.getItem('eira_eventos');
-        if (salvos) setEventos(JSON.parse(salvos));
-      } catch {}
-    }
-
-    async function buscarEventos() {
-      try {
-        const { data, error } = await supabase
-          .from('eventos')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (data && !error) {
-          setEventos(data as Evento[]);
-          if (typeof window !== 'undefined') {
-            try {
-              localStorage.setItem('eira_eventos', JSON.stringify(data));
-            } catch {}
-          }
-        }
-      } catch (err) {
-        console.warn('Erro ao carregar eventos:', err);
-      }
-    }
-
-    buscarEventos();
+    carregarDadosGerais();
   }, []);
 
   // Modal de Baixa Manual
@@ -298,6 +292,7 @@ export default function AdminPage() {
     metodo: MetodoPagamento,
     novoStatus: 'pago' | 'isento'
   ) => {
+    await atualizarStatusInscricaoSupabase(inscricaoId, novoStatus, metodo);
     setInscricoes((prev) =>
       prev.map((i) =>
         i.id === inscricaoId
@@ -308,7 +303,8 @@ export default function AdminPage() {
     sucesso('Pagamento confirmado com sucesso!');
   };
 
-  const handleReverterStatus = (inscricaoId: string) => {
+  const handleReverterStatus = async (inscricaoId: string) => {
+    await atualizarStatusInscricaoSupabase(inscricaoId, 'pendente');
     setInscricoes((prev) =>
       prev.map((i) =>
         i.id === inscricaoId ? { ...i, status: 'pendente', metodo_pag: null } : i
@@ -318,67 +314,39 @@ export default function AdminPage() {
   };
 
   const handleSalvarEvento = async (novoEvento: Partial<Evento>) => {
-    let listaAtualizada: Evento[];
-    let eventoSalvo: Evento;
+    const eventoSalvo = await salvarEventoSupabase(novoEvento);
 
-    if (novoEvento.id) {
-      // Edição
-      listaAtualizada = eventos.map((ev) =>
-        ev.id === novoEvento.id
-          ? ({ ...ev, ...novoEvento, updated_at: new Date().toISOString() } as Evento)
-          : ev
-      );
-      eventoSalvo = listaAtualizada.find((e) => e.id === novoEvento.id)!;
-    } else {
-      // Novo
-      eventoSalvo = {
-        ...novoEvento,
-        id: crypto.randomUUID ? crypto.randomUUID() : `ev-${Date.now()}`,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        total_inscritos: 0,
-        inscritos_confirmados: 0,
-        vagas_restantes: novoEvento.vagas || 100,
-        receita_confirmada: 0,
-        ativo: true,
-      } as Evento;
-
-      listaAtualizada = [eventoSalvo, ...eventos];
-    }
-
-    setEventos(listaAtualizada);
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('eira_eventos', JSON.stringify(listaAtualizada));
-      } catch {}
-    }
-
-    // Salva no Supabase
-    try {
-      await supabase.from('eventos').upsert({
-        id: eventoSalvo.id,
-        slug: eventoSalvo.slug,
-        nome: eventoSalvo.nome,
-        descricao: eventoSalvo.descricao,
-        data_inicio: eventoSalvo.data_inicio,
-        data_fim: eventoSalvo.data_fim,
-        vagas: eventoSalvo.vagas,
-        valor: eventoSalvo.valor,
-        categoria: eventoSalvo.categoria,
-        rede: eventoSalvo.rede,
-        campos: eventoSalvo.campos,
-        ativo: eventoSalvo.ativo,
-        imagem_url: eventoSalvo.imagem_url,
-        local_nome: eventoSalvo.local_nome,
-        updated_at: new Date().toISOString(),
-      });
-    } catch (err) {
-      console.warn('Erro ao salvar no Supabase:', err);
-    }
+    setEventos((prev) => {
+      const idx = prev.findIndex((e) => e.id === eventoSalvo.id || e.slug === eventoSalvo.slug);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = eventoSalvo;
+        return copy;
+      }
+      return [eventoSalvo, ...prev];
+    });
 
     setEventoParaEditar(null);
     setAbaAtiva('eventos');
-    sucesso(`Evento "${eventoSalvo.nome}" salvo! Link direto: /evento/${eventoSalvo.slug}`);
+    sucesso(`Evento "${eventoSalvo.nome}" salvo no banco de dados oficial e visível para todos os pastores e líderes!`);
+  };
+
+  // Limpeza automática de comprovantes com mais de 60 dias ao inicializar
+  useEffect(() => {
+    executarLimpezaComprovantesAntigos(60).catch(() => {});
+  }, []);
+
+  const handleLimparComprovantes = async () => {
+    const res = await executarLimpezaComprovantesAntigos(60);
+    if (res.totalRemovidos > 0) {
+      sucesso(res.mensagem);
+      try {
+        const salvos = localStorage.getItem('eira_inscricoes');
+        if (salvos) setInscricoes(JSON.parse(salvos));
+      } catch {}
+    } else {
+      info(res.mensagem);
+    }
   };
 
   const copiarLinkEvento = (slug: string) => {
@@ -396,8 +364,16 @@ export default function AdminPage() {
       <div className="min-h-screen bg-[#09090B] flex items-center justify-center p-4">
         <div className="w-full max-w-md bg-[#141418] p-8 rounded-[var(--radius-box,0.75rem)] border border-[#2E2E35] shadow-2xl space-y-6 text-left">
           <div className="text-center space-y-3">
-            <div className="w-14 h-14 rounded-[var(--radius-btn,0.5rem)] bg-black text-[var(--accent,#FACC15)] flex items-center justify-center font-black text-2xl mx-auto border border-[#2E2E35] shadow-md">
-              {igrejaConfig.nome.charAt(0)}
+            <div className="w-16 h-16 rounded-[var(--radius-btn,0.5rem)] bg-black text-[var(--accent,#FACC15)] flex items-center justify-center font-black text-2xl mx-auto border border-[#2E2E35] shadow-md overflow-hidden">
+              {igrejaConfig?.logoUrl ? (
+                <img
+                  src={igrejaConfig.logoUrl}
+                  alt={igrejaConfig.nome}
+                  className="w-full h-full object-contain p-1.5"
+                />
+              ) : (
+                igrejaConfig.nome.charAt(0)
+              )}
             </div>
             <div>
               <h1 className="text-2xl font-black tracking-tight text-[#FAFAFA]">
@@ -881,45 +857,80 @@ export default function AdminPage() {
                   </Button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                   {eventos.map((ev) => (
                     <div
                       key={ev.id}
-                      className="p-5 rounded-[var(--radius-box,0.75rem)] bg-white border border-[#E4E4E7] space-y-3 shadow-sm flex flex-col justify-between"
+                      className="rounded-[var(--radius-box,0.75rem)] bg-white border border-[#E4E4E7] overflow-hidden shadow-sm flex flex-col justify-between group hover:shadow-md hover:border-black/20 transition-all duration-200"
                     >
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-black text-[var(--accent,#FACC15)]">
+                      {/* Banner do Evento 16:9 */}
+                      <div className="relative w-full aspect-video bg-[#0A0A0A] overflow-hidden">
+                        {ev.imagem_url ? (
+                          <img
+                            src={ev.imagem_url}
+                            alt={`Banner de ${ev.nome}`}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center bg-[#18181B] text-[var(--accent,#FACC15)] p-4 text-center">
+                            <span className="font-black text-sm tracking-tight">EIRA CHURCH</span>
+                            <span className="text-[10px] font-bold text-[#A1A1AA] uppercase mt-1">
+                              REDE {ev.rede.toUpperCase()}
+                            </span>
+                          </div>
+                        )}
+                        {/* Badges Flutuantes sobre o Banner */}
+                        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-10">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-black text-[var(--accent,#FACC15)] shadow-sm">
                             {ev.rede}
                           </span>
-                          <span className="text-xs font-bold text-[#0A0A0A] tabular-nums">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-white/90 text-[#0A0A0A] shadow-sm backdrop-blur-xs">
+                            {ev.categoria}
+                          </span>
+                        </div>
+                        <div className="absolute bottom-2.5 right-2.5 z-10">
+                          <span className="px-2.5 py-0.5 rounded text-xs font-black bg-black/90 text-white border border-white/20 shadow-sm tabular-nums backdrop-blur-xs">
                             {formatarMoeda(ev.valor)}
                           </span>
                         </div>
-                        <h4 className="font-extrabold text-sm text-[#0A0A0A] line-clamp-1">
-                          {ev.nome}
-                        </h4>
-                        <p className="text-xs text-[#71717A]">
-                          {formatarDataCurta(ev.data_inicio)} • {ev.vagas} vagas
-                        </p>
                       </div>
 
-                      <div className="pt-2 border-t border-[#F4F4F5] flex items-center justify-between">
-                        <button
-                          onClick={() => copiarLinkEvento(ev.slug)}
-                          className="text-xs font-bold text-black flex items-center hover:text-[var(--accent-hover,#CA8A04)] transition-colors cursor-pointer"
-                        >
-                          <Copy className="w-3.5 h-3.5 mr-1" />
-                          Copiar Link
-                        </button>
-                        <Link
-                          href={`/evento/${ev.slug}`}
-                          target="_blank"
-                          className="text-xs text-[#71717A] hover:text-black flex items-center"
-                        >
-                          <span>Abrir</span>
-                          <ExternalLink className="w-3 h-3 ml-1" />
-                        </Link>
+                      {/* Informações e Ações */}
+                      <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
+                        <div className="space-y-1.5">
+                          <h4 className="font-extrabold text-sm text-[#0A0A0A] line-clamp-1 group-hover:text-[var(--accent-hover,#CA8A04)] transition-colors">
+                            {ev.nome}
+                          </h4>
+                          <p className="text-xs text-[#71717A] flex items-center gap-1">
+                            <span>📅 {formatarDataCurta(ev.data_inicio)}</span>
+                            <span>•</span>
+                            <span>👥 {ev.vagas} vagas</span>
+                          </p>
+                          {ev.local_nome && (
+                            <p className="text-[11px] text-[#71717A] truncate">
+                              📍 {ev.local_nome}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="pt-3 border-t border-[#F4F4F5] flex items-center justify-between">
+                          <button
+                            type="button"
+                            onClick={() => copiarLinkEvento(ev.slug)}
+                            className="text-xs font-bold text-black flex items-center hover:text-[var(--accent-hover,#CA8A04)] transition-colors cursor-pointer"
+                          >
+                            <Copy className="w-3.5 h-3.5 mr-1" />
+                            Copiar Link
+                          </button>
+                          <Link
+                            href={`/evento/${ev.slug}`}
+                            target="_blank"
+                            className="text-xs font-bold text-[#71717A] hover:text-black flex items-center transition-colors"
+                          >
+                            <span>Abrir Página</span>
+                            <ExternalLink className="w-3 h-3 ml-1" />
+                          </Link>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -943,6 +954,34 @@ export default function AdminPage() {
           {/* ==================================================== */}
           {abaAtiva === 'inscricoes' && (
             <div className="space-y-4">
+              {/* Barra de Retenção e Otimização de Comprovantes */}
+              {podeAcessarFinancas && (
+                <div className="p-3.5 rounded-xl bg-[#F8FAFC] border border-[#E2E8F0] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left">
+                  <div className="flex items-center space-x-2.5">
+                    <span className="p-1.5 rounded-lg bg-[#DCFCE7] text-[#166534]">
+                      <ShieldCheck className="w-4 h-4" />
+                    </span>
+                    <div>
+                      <p className="text-xs font-bold text-[#0F172A]">
+                        Política de Economia de Espaço & LGPD (60 dias)
+                      </p>
+                      <p className="text-[11px] text-[#64748B]">
+                        Prints de comprovantes com mais de 60 dias são excluídos para poupar espaço em banco de dados, mantendo confirmações intactas.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleLimparComprovantes}
+                    className="shrink-0 text-xs"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 mr-1.5 text-[#DC2626]" />
+                    Limpar Comprovantes Antigos (+60 dias)
+                  </Button>
+                </div>
+              )}
+
               <FilterBar
                 eventos={eventos}
                 onExportarCsv={() => exportarCsvInscricoes(inscricoesFiltradas)}
@@ -951,16 +990,12 @@ export default function AdminPage() {
 
               <DataTable
                 inscricoes={inscricoesFiltradas}
-                podeConfirmarBaixa={podeAcessarFinancas}
+                podeConfirmarBaixa={true}
                 onAbrirBaixaManual={(i) => {
-                  if (!podeAcessarFinancas) {
-                    info('Apenas pastores e administradores podem confirmar pagamentos.');
-                    return;
-                  }
                   setInscricaoParaBaixa(i);
                   setModalBaixaAberto(true);
                 }}
-                onReverterStatus={podeAcessarFinancas ? handleReverterStatus : undefined}
+                onReverterStatus={handleReverterStatus}
               />
             </div>
           )}
@@ -993,59 +1028,77 @@ export default function AdminPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {eventos.map((ev) => (
-                  <div
-                    key={ev.id}
-                    className="bg-white rounded-[var(--radius-box,0.75rem)] border border-[#E4E4E7] overflow-hidden flex flex-col justify-between shadow-sm"
-                  >
-                    <div className="aspect-video bg-black relative">
-                      {ev.imagem_url ? (
-                        <img
-                          src={ev.imagem_url}
-                          alt=""
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-[var(--accent,#FACC15)] font-black text-sm">
-                          {igrejaConfig.nome.toUpperCase()}
+                {eventos.map((ev) => {
+                  const inscritosDesteEvento = inscricoes.filter(
+                    (i) => i.evento_id === ev.id || i.evento?.nome === ev.nome
+                  );
+                  const pagasDesteEvento = inscritosDesteEvento.filter((i) => i.status === 'pago').length;
+                  const pendentesDesteEvento = inscritosDesteEvento.filter((i) => i.status === 'pendente').length;
+
+                  return (
+                    <div
+                      key={ev.id}
+                      className="bg-white rounded-[var(--radius-box,0.75rem)] border border-[#E4E4E7] overflow-hidden flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow"
+                    >
+                      <div className="aspect-video bg-black relative">
+                        {ev.imagem_url ? (
+                          <img
+                            src={ev.imagem_url}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-[var(--accent,#FACC15)] font-black text-sm">
+                            {igrejaConfig.nome.toUpperCase()}
+                          </div>
+                        )}
+                        <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black bg-black text-[var(--accent,#FACC15)]">
+                          {ev.rede}
+                        </span>
+                        <span className="absolute top-2 right-2 px-2 py-0.5 rounded text-[10px] font-extrabold bg-white text-black shadow-sm">
+                          {formatarMoeda(ev.valor)}
+                        </span>
+                      </div>
+
+                      <div className="p-5 space-y-3 flex-1 flex flex-col justify-between">
+                        <div className="space-y-1">
+                          <h4 className="font-bold text-base text-[#0A0A0A] line-clamp-1">
+                            {ev.nome}
+                          </h4>
+                          <p className="text-xs text-[#71717A]">
+                            📅 {formatarDataCurta(ev.data_inicio)} • 📍 {ev.local_nome || 'Eira Church'}
+                          </p>
+                          <div className="pt-2">
+                            <span className="inline-flex items-center px-2 py-1 rounded-md text-[11px] font-bold bg-[#F4F4F5] text-[#0A0A0A] border border-[#E4E4E7]">
+                              👥 {inscritosDesteEvento.length} inscritos ({pagasDesteEvento} pagos • {pendentesDesteEvento} pendentes)
+                            </span>
+                          </div>
                         </div>
-                      )}
-                      <span className="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black bg-black text-[var(--accent,#FACC15)]">
-                        {ev.rede}
-                      </span>
-                    </div>
 
-                    <div className="p-5 space-y-3 flex-1 flex flex-col justify-between">
-                      <div>
-                        <h4 className="font-bold text-base text-[#0A0A0A] line-clamp-1">
-                          {ev.nome}
-                        </h4>
-                        <p className="text-xs text-[#71717A]">
-                          {formatarDataCurta(ev.data_inicio)} • {formatarMoeda(ev.valor)}
-                        </p>
-                      </div>
-
-                      <div className="pt-3 border-t border-[#F4F4F5] flex items-center justify-between text-xs">
-                        <button
-                          onClick={() => copiarLinkEvento(ev.slug)}
-                          className="font-bold text-black flex items-center hover:underline cursor-pointer"
-                        >
-                          <Copy className="w-3.5 h-3.5 mr-1" />
-                          Copiar Link
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEventoParaEditar(ev);
-                            setAbaAtiva('novo-evento');
-                          }}
-                          className="text-xs font-semibold text-[#71717A] hover:text-black cursor-pointer"
-                        >
-                          Editar Evento
-                        </button>
+                        <div className="pt-3 border-t border-[#F4F4F5] flex items-center justify-between text-xs">
+                          <button
+                            type="button"
+                            onClick={() => copiarLinkEvento(ev.slug)}
+                            className="font-bold text-black flex items-center hover:underline cursor-pointer"
+                          >
+                            <Copy className="w-3.5 h-3.5 mr-1" />
+                            Copiar Link
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEventoParaEditar(ev);
+                              setAbaAtiva('novo-evento');
+                            }}
+                            className="text-xs font-bold text-black hover:text-[var(--accent-hover,#CA8A04)] cursor-pointer"
+                          >
+                            ✏️ Editar Evento
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

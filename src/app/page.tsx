@@ -7,7 +7,7 @@ import { EventCard } from '../components/event/EventCard';
 import { EventCardSkeleton } from '../components/event/EventCardSkeleton';
 import { InscricaoModal } from '../components/form/InscricaoModal';
 import { Evento } from '../types/evento';
-import { supabase } from '../lib/supabase';
+import { buscarEventosSupabase, carregarEventosLocal } from '../lib/eventoAdapter';
 import { useAdminStore } from '../store/adminStore';
 import { animateCardsEntrance, animateHeroEntrance } from '../lib/animations';
 import {
@@ -38,42 +38,28 @@ export default function HomePage() {
   const heroRef = useRef<HTMLElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
-  // Carrega eventos do LocalStorage e do Supabase
+  // Carrega eventos sincronizados do LocalStorage e do Supabase
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const salvos = localStorage.getItem('eira_eventos');
-        if (salvos) {
-          setEventos(JSON.parse(salvos));
-          setLoading(false);
-        }
-      } catch {}
+    const locais = carregarEventosLocal();
+    if (locais.length > 0) {
+      setEventos(locais);
+      setLoading(false);
     }
 
-    async function buscarEventos() {
+    async function buscar() {
       try {
-        const { data, error } = await supabase
-          .from('eventos')
-          .select('*')
-          .eq('ativo', true)
-          .order('data_inicio', { ascending: true });
-
-        if (data && !error) {
-          setEventos(data as Evento[]);
-          if (typeof window !== 'undefined') {
-            try {
-              localStorage.setItem('eira_eventos', JSON.stringify(data));
-            } catch {}
-          }
+        const dados = await buscarEventosSupabase();
+        if (dados && dados.length > 0) {
+          setEventos(dados);
         }
       } catch (err) {
-        console.warn('Erro ao carregar eventos do Supabase:', err);
+        console.warn('Erro ao carregar eventos:', err);
       } finally {
         setLoading(false);
       }
     }
 
-    buscarEventos();
+    buscar();
   }, []);
 
   // Animações GSAP de entrada sutis

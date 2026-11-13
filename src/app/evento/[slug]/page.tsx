@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { EventHero } from '../../../components/event/EventHero';
 import { InscricaoForm } from '../../../components/form/InscricaoForm';
-import { supabase } from '../../../lib/supabase';
+import { buscarEventosSupabase, carregarEventosLocal } from '../../../lib/eventoAdapter';
 import { Evento } from '../../../types/evento';
 import { ArrowLeft, Church, Loader2 } from 'lucide-react';
 
@@ -21,32 +21,20 @@ export default function EventoSlugPage() {
     if (!slug) return;
 
     // 1. Tenta carregar do cache local imediatamente para exibição ultra rápida
-    if (typeof window !== 'undefined') {
-      try {
-        const salvos = localStorage.getItem('eira_eventos');
-        if (salvos) {
-          const lista: Evento[] = JSON.parse(salvos);
-          const encontrado = lista.find((ev) => ev.slug === slug);
-          if (encontrado) {
-            setEvento(encontrado);
-            setLoading(false);
-          }
-        }
-      } catch {}
+    const locais = carregarEventosLocal();
+    const encontradoLocal = locais.find((ev) => ev.slug === slug);
+    if (encontradoLocal) {
+      setEvento(encontradoLocal);
+      setLoading(false);
     }
 
-    // 2. Consulta no Supabase para pegar a versão oficial mais recente
+    // 2. Consulta no Supabase via adapter oficial
     async function carregarDoSupabase() {
       try {
-        const { data, error } = await supabase
-          .from('eventos')
-          .select('*')
-          .eq('slug', slug)
-          .eq('ativo', true)
-          .single();
-
-        if (data && !error) {
-          setEvento(data as Evento);
+        const todos = await buscarEventosSupabase();
+        const encontrado = todos.find((ev) => ev.slug === slug);
+        if (encontrado) {
+          setEvento(encontrado);
         }
       } catch (err) {
         console.error('Erro ao buscar evento no Supabase:', err);

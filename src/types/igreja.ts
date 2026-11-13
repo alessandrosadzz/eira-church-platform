@@ -46,6 +46,11 @@ export interface IgrejaConfig {
   whatsapp: string;
   instagram: string;
   email: string;
+  chavePix?: string;
+  copiaEColaPix?: string;
+  titularPix?: string;
+  cidadePix?: string;
+  qrCodePixUrl?: string;
 }
 
 export interface VisitanteConexao {

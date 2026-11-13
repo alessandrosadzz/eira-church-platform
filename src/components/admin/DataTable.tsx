@@ -2,12 +2,13 @@
 
 // src/components/admin/DataTable.tsx
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Inscricao, MetodoPagamento } from '../../types/inscricao';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { Modal } from '../ui/Modal';
 import { formatarDataHora } from '../../lib/formatters';
-import { AlertTriangle, CheckCircle, RotateCcw, Lock } from 'lucide-react';
+import { AlertTriangle, CheckCircle, RotateCcw, Lock, Paperclip, ExternalLink } from 'lucide-react';
 
 export interface DataTableProps {
   inscricoes: Inscricao[];
@@ -24,6 +25,7 @@ export const DataTable: React.FC<DataTableProps> = ({
   isLoading = false,
   podeConfirmarBaixa = true,
 }) => {
+  const [comprovanteVisualizar, setComprovanteVisualizar] = useState<{ url: string; nome: string } | null>(null);
   if (isLoading) {
     return (
       <div className="w-full bg-white rounded-xl border border-[#E4E4E7] p-12 text-center">
@@ -100,7 +102,23 @@ export const DataTable: React.FC<DataTableProps> = ({
 
                   {/* Método */}
                   <td className="py-3.5 px-4 text-xs font-semibold text-[#52525B]">
-                    {metodoFormatado}
+                    <div>{metodoFormatado}</div>
+                    {inscricao.comprovante_url && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setComprovanteVisualizar({
+                            url: inscricao.comprovante_url!,
+                            nome: inscricao.nome,
+                          })
+                        }
+                        className="inline-flex items-center px-1.5 py-0.5 mt-1 rounded text-[10px] font-bold bg-[#DCFCE7] text-[#166534] border border-[#BBF7D0] hover:bg-[#BBF7D0] transition-colors cursor-pointer"
+                        title="Visualizar print do comprovante"
+                      >
+                        <Paperclip className="w-3 h-3 mr-0.5" />
+                        Comprovante
+                      </button>
+                    )}
                   </td>
 
                   {/* Saúde / Restrições */}
@@ -164,6 +182,47 @@ export const DataTable: React.FC<DataTableProps> = ({
           </tbody>
         </table>
       </div>
+
+      {/* Modal de Visualização Rápida de Comprovante */}
+      {comprovanteVisualizar && (
+        <Modal
+          isOpen={true}
+          onClose={() => setComprovanteVisualizar(null)}
+          titulo="Comprovante de Pagamento"
+          subtitulo={`Participante: ${comprovanteVisualizar.nome}`}
+          maxWidth="md"
+        >
+          <div className="space-y-4 text-center">
+            <div className="max-h-[70vh] overflow-auto rounded-xl border border-[#E4E4E7] bg-[#0A0A0A] p-2 flex items-center justify-center">
+              <img
+                src={comprovanteVisualizar.url}
+                alt={`Comprovante de ${comprovanteVisualizar.nome}`}
+                className="max-h-[65vh] w-auto object-contain rounded"
+              />
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+              <a
+                href={comprovanteVisualizar.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-bold text-black hover:text-[var(--accent-hover,#CA8A04)] inline-flex items-center"
+              >
+                <span>Abrir imagem em nova aba</span>
+                <ExternalLink className="w-3.5 h-3.5 ml-1" />
+              </a>
+
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setComprovanteVisualizar(null)}
+              >
+                Fechar Visualizador
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };
