@@ -89,8 +89,11 @@ CREATE TABLE IF NOT EXISTS inscricoes (
 CREATE TABLE IF NOT EXISTS visitantes_conexao (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   nome           text NOT NULL,
+  sexo           text NOT NULL DEFAULT 'Homem', -- 'Homem', 'Mulher', 'Casal'
   telefone       text NOT NULL,
   bairro         text NOT NULL,
+  endereco       text,
+  maps_url       text,
   quem_convidou  text,
   faixa_etaria   text DEFAULT 'Adulto',
   quer_celula    boolean DEFAULT true,

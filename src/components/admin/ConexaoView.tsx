@@ -39,6 +39,7 @@ export const ConexaoView: React.FC = () => {
   const [filtroStatus, setFiltroStatus] = useState<
     'todos' | 'novo' | 'em_contato' | 'integrado'
   >('todos');
+  const [filtroSexo, setFiltroSexo] = useState<'todos' | 'Homem' | 'Mulher' | 'Casal'>('todos');
   const [modalCadastroAberto, setModalCadastroAberto] = useState(false);
   const [modalQrAberto, setModalQrAberto] = useState(false);
 
@@ -54,6 +55,7 @@ export const ConexaoView: React.FC = () => {
 
   // Estados do formulário de cadastro rápido
   const [novoNome, setNovoNome] = useState('');
+  const [novoSexo, setNovoSexo] = useState<'Homem' | 'Mulher' | 'Casal'>('Homem');
   const [novoTelefone, setNovoTelefone] = useState('');
   const [novoBairro, setNovoBairro] = useState('');
   const [novoQuemConvidou, setNovoQuemConvidou] = useState('');
@@ -85,9 +87,12 @@ export const ConexaoView: React.FC = () => {
       const matchStatus =
         filtroStatus === 'todos' || v.status === filtroStatus;
 
-      return matchBusca && matchStatus;
+      const matchSexo =
+        filtroSexo === 'todos' || (v.sexo || 'Homem') === filtroSexo;
+
+      return matchBusca && matchStatus && matchSexo;
     });
-  }, [visitantes, busca, filtroStatus]);
+  }, [visitantes, busca, filtroStatus, filtroSexo]);
 
   // Salvar novo visitante
   const handleSalvarVisitante = (e: React.FormEvent) => {
@@ -105,6 +110,7 @@ export const ConexaoView: React.FC = () => {
 
     adicionarVisitante({
       nome: novoNome.trim(),
+      sexo: novoSexo,
       telefone: novoTelefone.trim(),
       bairro: novoBairro.trim() || 'Não informado',
       quem_convidou: novoQuemConvidou.trim() || 'Culto de Domingo',
@@ -120,6 +126,7 @@ export const ConexaoView: React.FC = () => {
 
     // Limpa formulário e fecha modal
     setNovoNome('');
+    setNovoSexo('Homem');
     setNovoTelefone('');
     setNovoBairro('');
     setNovoQuemConvidou('');
@@ -255,26 +262,51 @@ export const ConexaoView: React.FC = () => {
           />
         </div>
 
-        {/* Filtro por Status */}
-        <div className="flex items-center overflow-x-auto w-full md:w-auto space-x-1.5 no-scrollbar">
-          {[
-            { id: 'todos', label: 'Todos' },
-            { id: 'novo', label: 'Novos' },
-            { id: 'em_contato', label: 'Em Contato' },
-            { id: 'integrado', label: 'Integrados em Célula' },
-          ].map((st) => (
-            <button
-              key={st.id}
-              onClick={() => setFiltroStatus(st.id as any)}
-              className={`px-3 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                filtroStatus === st.id
-                  ? 'bg-black text-[var(--accent,#FACC15)] border border-black shadow-sm'
-                  : 'bg-[#F4F4F5] text-[#71717A] border border-[#E4E4E7] hover:border-black'
-              }`}
-            >
-              {st.label}
-            </button>
-          ))}
+        {/* Filtros por Status e Gênero */}
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          {/* Status */}
+          <div className="flex items-center overflow-x-auto space-x-1.5 no-scrollbar">
+            {[
+              { id: 'todos', label: 'Todos' },
+              { id: 'novo', label: 'Novos' },
+              { id: 'em_contato', label: 'Em Contato' },
+              { id: 'integrado', label: 'Integrados em Célula' },
+            ].map((st) => (
+              <button
+                key={st.id}
+                onClick={() => setFiltroStatus(st.id as any)}
+                className={`px-3 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                  filtroStatus === st.id
+                    ? 'bg-black text-[var(--accent,#FACC15)] border border-black shadow-sm'
+                    : 'bg-[#F4F4F5] text-[#71717A] border border-[#E4E4E7] hover:border-black'
+                }`}
+              >
+                {st.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Gênero / Rede */}
+          <div className="flex items-center space-x-1 border-l border-[#E4E4E7] pl-2 overflow-x-auto no-scrollbar">
+            {[
+              { id: 'todos', label: 'Todos' },
+              { id: 'Homem', label: '👨 Homens' },
+              { id: 'Mulher', label: '👩 Mulheres' },
+              { id: 'Casal', label: '👫 Casais' },
+            ].map((sx) => (
+              <button
+                key={sx.id}
+                onClick={() => setFiltroSexo(sx.id as any)}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                  filtroSexo === sx.id
+                    ? 'bg-black text-[var(--accent,#FACC15)] border border-black shadow-sm'
+                    : 'bg-[#FAFAFA] text-[#71717A] border border-[#E4E4E7] hover:border-black'
+                }`}
+              >
+                {sx.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -329,11 +361,24 @@ export const ConexaoView: React.FC = () => {
                       </p>
                     </div>
 
-                    <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-black uppercase border ${statusConfig.cor}`}
-                    >
-                      {statusConfig.label}
-                    </span>
+                    <div className="flex items-center space-x-1.5 flex-wrap justify-end gap-y-1">
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-black uppercase border ${
+                          v.sexo === 'Mulher'
+                            ? 'bg-[#FDF2F8] text-[#9D174D] border-[#FBCFE8]'
+                            : v.sexo === 'Casal'
+                            ? 'bg-[#FEF3C7] text-[#92400E] border-[#FDE68A]'
+                            : 'bg-[#EFF6FF] text-[#1E40AF] border-[#BFDBFE]'
+                        }`}
+                      >
+                        {v.sexo === 'Mulher' ? '👩 Mulher' : v.sexo === 'Casal' ? '👫 Casal' : '👨 Homem'}
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-black uppercase border ${statusConfig.cor}`}
+                      >
+                        {statusConfig.label}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Informações de Acolhimento */}
@@ -439,6 +484,28 @@ export const ConexaoView: React.FC = () => {
                 onChange={(e) => setNovoNome(e.target.value)}
                 placeholder="Ex: Amanda Ferreira"
               />
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-tight text-[#0A0A0A] mb-1.5">
+                  Gênero / Rede de Célula Indicada
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['Homem', 'Mulher', 'Casal'] as const).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setNovoSexo(s)}
+                      className={`h-11 rounded-lg border text-xs font-extrabold flex items-center justify-center space-x-1.5 transition-all cursor-pointer ${
+                        novoSexo === s
+                          ? 'bg-black text-[var(--accent,#FACC15)] border-black shadow-sm'
+                          : 'bg-[#FAFAFA] text-[#71717A] border-[#E4E4E7] hover:border-black'
+                      }`}
+                    >
+                      <span>{s === 'Homem' ? '👨 Homem' : s === 'Mulher' ? '👩 Mulher' : '👫 Casal'}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               <Input
                 label="WhatsApp com DDD"

@@ -315,7 +315,7 @@ export const CelulasView: React.FC = () => {
 
         {/* Filtro por Rede */}
         <div className="flex items-center overflow-x-auto w-full md:w-auto space-x-1.5 no-scrollbar">
-          {['Todas', 'Hype', 'One Way', 'Família', 'Casais'].map((r) => (
+          {['Todas', 'Homens', 'Mulheres', 'Hype', 'One Way', 'Casais', 'Família'].map((r) => (
             <button
               key={r}
               onClick={() => setRedeFiltro(r)}
@@ -677,10 +677,12 @@ export const CelulasView: React.FC = () => {
                     onChange={(e) => setNovaRede(e.target.value as any)}
                     className="w-full h-12 px-3 rounded-lg bg-white border border-[#E4E4E7] text-sm text-[#0A0A0A]"
                   >
-                    <option value="Hype">Rede Hype (Teens)</option>
-                    <option value="One Way">Rede One Way (Jovens)</option>
-                    <option value="Família">Rede da Família</option>
+                    <option value="Homens">Rede de Homens</option>
+                    <option value="Mulheres">Rede de Mulheres</option>
+                    <option value="Hype">Rede Hype (Teens / Adolescentes)</option>
+                    <option value="One Way">Rede One Way (Jovens / Universitários)</option>
                     <option value="Casais">Rede de Casais</option>
+                    <option value="Família">Rede da Família</option>
                     <option value="Adultos">Rede de Adultos</option>
                     <option value="Geral">Geral</option>
                   </select>

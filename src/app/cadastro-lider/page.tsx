@@ -282,12 +282,15 @@ export default function CadastroLiderPage() {
                 <select
                   value={rede}
                   onChange={(e) =>
-                    setRede(e.target.value as 'Hype' | 'One Way' | 'Família' | 'Casais' | 'Adultos')
+                    setRede(e.target.value as any)
                   }
                   className="w-full h-12 px-3 rounded-lg bg-white border border-[#E4E4E7] text-sm text-[#0A0A0A]"
                 >
+                  <option value="Homens">Rede de Homens</option>
+                  <option value="Mulheres">Rede de Mulheres</option>
                   <option value="Hype">Rede Hype (Teens / Adolescentes)</option>
                   <option value="One Way">Rede One Way (Jovens / Universitários)</option>
+                  <option value="Casais">Rede de Casais</option>
                   <option value="Família">Rede Família & Casais</option>
                   <option value="Adultos">Rede Adultos</option>
                 </select>

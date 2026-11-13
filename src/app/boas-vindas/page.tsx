@@ -1,7 +1,7 @@
 // src/app/boas-vindas/page.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useAdminStore } from '../../store/adminStore';
 import { Input } from '../../components/ui/Input';
@@ -15,15 +15,19 @@ import {
   Clock,
   Sparkles,
   ArrowLeft,
+  ExternalLink,
+  Home,
 } from 'lucide-react';
 
 export default function BoasVindasPage() {
   const { sucesso, erro } = useToast();
-  const { igrejaConfig, adicionarVisitante } = useAdminStore();
+  const { igrejaConfig, adicionarVisitante, celulas } = useAdminStore();
 
   const [nome, setNome] = useState('');
+  const [sexo, setSexo] = useState<'Homem' | 'Mulher'>('Homem');
   const [telefone, setTelefone] = useState('');
   const [bairro, setBairro] = useState('');
+  const [endereco, setEndereco] = useState('');
   const [quemConvidou, setQuemConvidou] = useState('');
   const [faixaEtaria, setFaixaEtaria] = useState<
     'Criança' | 'Adolescente (12-17)' | 'Jovem (18-29)' | 'Adulto' | 'Melhor Idade'
@@ -32,6 +36,24 @@ export default function BoasVindasPage() {
   const [pedidoOracao, setPedidoOracao] = useState('');
 
   const [enviadoComSucesso, setEnviadoComSucesso] = useState(false);
+
+  // Link do Google Maps gerado em tempo real
+  const mapsLink = useMemo(() => {
+    const local = endereco.trim() || bairro.trim();
+    if (!local) return '';
+    return `https://maps.google.com/?q=${encodeURIComponent(`${local}, Cascavel - PR`)}`;
+  }, [endereco, bairro]);
+
+  // Célula mais próxima identificada por bairro
+  const celulaProxima = useMemo(() => {
+    if (!bairro.trim() && !endereco.trim()) return null;
+    const termo = (bairro.trim() || endereco.trim()).toLowerCase();
+    return celulas.find(
+      (c) =>
+        c.bairro.toLowerCase().includes(termo) ||
+        c.endereco.toLowerCase().includes(termo)
+    );
+  }, [bairro, endereco, celulas]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,9 +70,12 @@ export default function BoasVindasPage() {
 
     adicionarVisitante({
       nome: nome.trim(),
+      sexo,
       telefone: telefone.trim(),
       bairro: bairro.trim() || 'Não informado',
-      quem_convidou: quemConvidou.trim() || 'Culto de Domingo',
+      endereco: endereco.trim() || undefined,
+      maps_url: mapsLink || undefined,
+      quem_convidou: quemConvidou.trim() || 'Culto da Igreja',
       faixa_etaria: faixaEtaria,
       quer_celula: querCelula,
       pedido_oracao: pedidoOracao.trim() || undefined,
@@ -80,17 +105,20 @@ export default function BoasVindasPage() {
             </p>
           </div>
 
-          <div className="p-4 rounded-xl bg-[#FAFAFA] border border-[#E4E4E7] text-xs text-left space-y-2">
-            <div className="flex items-center space-x-2 text-[#0A0A0A] font-bold">
-              <Sparkles className="w-4 h-4 text-[var(--accent,#EAB308)]" />
-              <span>Nossos Próximos Cultos</span>
-            </div>
-            {igrejaConfig.cultos.slice(0, 2).map((c) => (
-              <p key={c.id} className="text-[#52525B]">
-                <strong className="text-black">{c.dia} às {c.horario}:</strong> {c.descricao}
+          {celulaProxima && (
+            <div className="p-4 rounded-xl bg-[#FEF08A]/30 border border-[#FDE047] text-xs text-left space-y-1">
+              <div className="flex items-center space-x-1.5 text-[#854D0E] font-bold">
+                <Home className="w-4 h-4 text-[#854D0E]" />
+                <span>Célula Pertinho de Você no {celulaProxima.bairro}!</span>
+              </div>
+              <p className="text-[#713F12]">
+                <strong>{celulaProxima.nome}</strong> ({celulaProxima.dia_semana} às {celulaProxima.horario})
               </p>
-            ))}
-          </div>
+              <p className="text-[11px] text-[#854D0E]">
+                Líder responsável: {celulaProxima.lider_nome}
+              </p>
+            </div>
+          )}
 
           <div className="pt-2">
             <Link
@@ -117,11 +145,12 @@ export default function BoasVindasPage() {
             <ArrowLeft className="w-4 h-4" />
             <span>Início</span>
           </Link>
-
           <div className="flex items-center space-x-2">
-            <span className="font-extrabold text-sm text-[#0A0A0A]">{igrejaConfig.nome}</span>
-            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-[var(--accent,#FACC15)] text-[var(--accent-text,#000000)]">
-              Conexão
+            <div className="w-6 h-6 rounded bg-black text-[var(--accent,#FACC15)] flex items-center justify-center font-black text-xs">
+              {igrejaConfig.nome.charAt(0)}
+            </div>
+            <span className="text-xs font-extrabold text-[#0A0A0A]">
+              {igrejaConfig.nome}
             </span>
           </div>
         </div>
@@ -154,6 +183,37 @@ export default function BoasVindasPage() {
             placeholder="Como você gostaria de ser chamado(a)?"
           />
 
+          {/* Seleção Homem / Mulher */}
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-tight text-[#0A0A0A] mb-1.5">
+              Gênero
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setSexo('Homem')}
+                className={`h-12 rounded-lg border text-xs font-extrabold flex items-center justify-center space-x-2 transition-all cursor-pointer ${
+                  sexo === 'Homem'
+                    ? 'bg-black text-[var(--accent,#FACC15)] border-black shadow-sm'
+                    : 'bg-[#FAFAFA] text-[#71717A] border-[#E4E4E7] hover:border-black'
+                }`}
+              >
+                <span>👨 Sou Homem</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSexo('Mulher')}
+                className={`h-12 rounded-lg border text-xs font-extrabold flex items-center justify-center space-x-2 transition-all cursor-pointer ${
+                  sexo === 'Mulher'
+                    ? 'bg-black text-[var(--accent,#FACC15)] border-black shadow-sm'
+                    : 'bg-[#FAFAFA] text-[#71717A] border-[#E4E4E7] hover:border-black'
+                }`}
+              >
+                <span>👩 Sou Mulher</span>
+              </button>
+            </div>
+          </div>
+
           <Input
             label="Seu WhatsApp com DDD"
             required
@@ -168,17 +228,56 @@ export default function BoasVindasPage() {
             <Input
               label="Bairro onde você mora"
               value={bairro}
-              onChange={(e) => setNovoBairro => setBairro(e.target.value)}
+              onChange={(e) => setBairro(e.target.value)}
               placeholder="Ex: Coqueiral, Centro, Neva..."
             />
 
             <Input
-              label="Quem te convidou hoje?"
-              value={quemConvidou}
-              onChange={(e) => setQuemConvidou(e.target.value)}
-              placeholder="Ex: Um amigo, Instagram, Família..."
+              label="Endereço ou Ponto de Referência"
+              value={endereco}
+              onChange={(e) => setEndereco(e.target.value)}
+              placeholder="Ex: Rua Paraná, 1500"
             />
           </div>
+
+          {/* Link Automático Google Maps e Proximidade de Célula */}
+          {mapsLink && (
+            <div className="p-3 rounded-lg bg-[#FAFAFA] border border-[#E4E4E7] flex items-center justify-between text-xs">
+              <div className="flex items-center space-x-2 text-[#52525B]">
+                <MapPin className="w-4 h-4 text-rose-500" />
+                <span>Localização: <strong>{bairro || endereco}</strong></span>
+              </div>
+              <a
+                href={mapsLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center space-x-1 text-black font-extrabold hover:underline"
+              >
+                <span>Abrir no Google Maps</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          )}
+
+          {/* Destaque de Célula Próxima em tempo real */}
+          {celulaProxima && (
+            <div className="p-3.5 rounded-lg bg-[#DCFCE7] border border-[#BBF7D0] text-xs space-y-1">
+              <div className="flex items-center space-x-1.5 text-[#166534] font-bold">
+                <Home className="w-4 h-4 text-[#166534]" />
+                <span>Temos uma célula pertinho de você no {celulaProxima.bairro}!</span>
+              </div>
+              <p className="text-[#15803D]">
+                <strong>{celulaProxima.nome}</strong> reúne toda {celulaProxima.dia_semana} às {celulaProxima.horario}.
+              </p>
+            </div>
+          )}
+
+          <Input
+            label="Quem te convidou hoje?"
+            value={quemConvidou}
+            onChange={(e) => setQuemConvidou(e.target.value)}
+            placeholder="Ex: Um amigo, Instagram, Família..."
+          />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -231,7 +330,7 @@ export default function BoasVindasPage() {
 
           <div className="pt-2">
             <Button type="submit" variant="primary" size="lg" fullWidth>
-              Enviar Meu Cadastro de Boas-Vindas
+              Enviar Meus Dados de Boas-Vindas
             </Button>
           </div>
         </form>

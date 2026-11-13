@@ -2,7 +2,7 @@
 
 // src/components/admin/AdminHeader.tsx
 
-import React from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useAdminStore, AbaAdmin, TemaWhiteLabel, UsuarioRole } from '../../store/adminStore';
 import { Button } from '../ui/Button';
 import {
@@ -18,6 +18,10 @@ import {
   UserCheck,
   Sun,
   Moon,
+  Bell,
+  Check,
+  Sparkles,
+  ExternalLink,
 } from 'lucide-react';
 
 export interface AdminHeaderProps {
@@ -39,9 +43,83 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
     igrejaConfig,
     modoCor,
     setModoCor,
+    visitantes,
+    celulas,
   } = useAdminStore();
 
+  const [menuNotificacoesAberto, setMenuNotificacoesAberto] = useState(false);
+  const [notificacoesLidas, setNotificacoesLidas] = useState<string[]>([]);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  // Fecha menu de notificações ao clicar fora
+  useEffect(() => {
+    const handleClickFora = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setMenuNotificacoesAberto(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickFora);
+    return () => document.removeEventListener('mousedown', handleClickFora);
+  }, []);
+
   const nomeExibicao = igrejaNome || igrejaConfig.nome || 'Eira Church';
+
+  // Notificações em tempo real calculadas pelo perfil
+  const notificacoes = useMemo(() => {
+    const lista: {
+      id: string;
+      titulo: string;
+      descricao: string;
+      tipo: 'visitante' | 'inscricao' | 'celula';
+      aba: AbaAdmin;
+      destaque?: boolean;
+    }[] = [];
+
+    const novosVisitantes = visitantes.filter((v) => v.status === 'novo');
+    if (novosVisitantes.length > 0) {
+      lista.push({
+        id: 'notif-novos-vis',
+        titulo: `🎉 ${novosVisitantes.length} ${novosVisitantes.length === 1 ? 'pessoa nova cadastrada' : 'pessoas novas cadastradas'}!`,
+        descricao:
+          usuarioRole === 'lider'
+            ? 'Pessoas acolhidas no culto querendo conhecer células no bairro.'
+            : 'Novos visitantes aguardando acompanhamento da equipe da Conexão.',
+        tipo: 'visitante',
+        aba: 'conexao',
+        destaque: true,
+      });
+    }
+
+    if (celulas.length > 0 && (usuarioRole === 'pastor' || usuarioRole === 'admin')) {
+      lista.push({
+        id: 'notif-celulas-rede',
+        titulo: `📍 ${celulas.length} células ativas na rede`,
+        descricao: 'Controle de frequência, batizados e endereços com Google Maps.',
+        tipo: 'celula',
+        aba: 'celulas',
+      });
+    }
+
+    if (lista.length === 0) {
+      lista.push({
+        id: 'notif-zerado',
+        titulo: 'Tudo em dia!',
+        descricao: 'Novas pessoas cadastradas ou inscrições de eventos aparecerão aqui.',
+        tipo: 'visitante',
+        aba: 'dashboard',
+      });
+    }
+
+    return lista;
+  }, [visitantes, celulas, usuarioRole]);
+
+  const contagemNaoLidas = notificacoes.filter(
+    (n) => !notificacoesLidas.includes(n.id) && n.id !== 'notif-zerado'
+  ).length;
+
+  const marcarTodasLidas = () => {
+    setNotificacoesLidas(notificacoes.map((n) => n.id));
+  };
 
   const temas: { id: TemaWhiteLabel; nome: string; cor: string }[] = [
     { id: 'eira-signature', nome: 'Eira Amarelo', cor: '#FACC15' },
@@ -102,8 +180,81 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
           </div>
         </div>
 
-        {/* Controles de Lado Direito: Perfil Ativo, Dark Mode, Tema e Logout */}
+        {/* Controles de Lado Direito: Notificações, Perfil Ativo, Dark Mode, Tema e Logout */}
         <div className="flex items-center space-x-2 sm:space-x-3">
+          {/* Central de Notificações com Badge */}
+          <div className="relative" ref={notifRef}>
+            <button
+              type="button"
+              onClick={() => setMenuNotificacoesAberto(!menuNotificacoesAberto)}
+              className="relative p-2 rounded-lg bg-[#F4F4F5] border border-[#E4E4E7] text-[#0A0A0A] hover:border-black transition-colors cursor-pointer"
+              title="Notificações da Liderança"
+              aria-label="Abrir notificações"
+            >
+              <Bell className="w-4 h-4 text-[#0A0A0A]" />
+              {contagemNaoLidas > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-600 text-white font-black text-[10px] flex items-center justify-center shadow-sm animate-pulse">
+                  {contagemNaoLidas}
+                </span>
+              )}
+            </button>
+
+            {/* Menu Dropdown de Notificações */}
+            {menuNotificacoesAberto && (
+              <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-[var(--radius-box,0.75rem)] border border-[#E4E4E7] shadow-xl z-50 overflow-hidden text-left">
+                <div className="p-3.5 border-b border-[#F4F4F5] flex items-center justify-between bg-[#FAFAFA]">
+                  <div className="flex items-center space-x-2">
+                    <Bell className="w-4 h-4 text-black" />
+                    <span className="font-extrabold text-xs text-[#0A0A0A]">
+                      Notificações & Atividades
+                    </span>
+                    {contagemNaoLidas > 0 && (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-rose-100 text-rose-700">
+                        {contagemNaoLidas} novas
+                      </span>
+                    )}
+                  </div>
+                  {contagemNaoLidas > 0 && (
+                    <button
+                      onClick={marcarTodasLidas}
+                      className="text-[11px] font-bold text-[#71717A] hover:text-black cursor-pointer"
+                    >
+                      Marcar lidas
+                    </button>
+                  )}
+                </div>
+
+                <div className="max-h-80 overflow-y-auto divide-y divide-[#F4F4F5]">
+                  {notificacoes.map((item) => (
+                    <div
+                      key={item.id}
+                      onClick={() => {
+                        setAbaAtiva(item.aba);
+                        setMenuNotificacoesAberto(false);
+                      }}
+                      className={`p-3.5 hover:bg-[#FAFAFA] transition-colors cursor-pointer space-y-1 ${
+                        item.destaque ? 'bg-[#FEF08A]/15' : ''
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-extrabold text-xs text-[#0A0A0A]">
+                          {item.titulo}
+                        </span>
+                        <span className="text-[10px] font-bold text-black flex items-center space-x-0.5 hover:underline">
+                          <span>Ver</span>
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#52525B] leading-relaxed">
+                        {item.descricao}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Badge do Papel Autenticado */}
           <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-[#F4F4F5] border border-[#E4E4E7]">
             <UserCheck className="w-3.5 h-3.5 text-[#71717A]" />

@@ -50,8 +50,11 @@ export interface IgrejaConfig {
 export interface VisitanteConexao {
   id: string;
   nome: string;
+  sexo: 'Homem' | 'Mulher' | 'Casal';
   telefone: string;
   bairro: string;
+  endereco?: string;
+  maps_url?: string;
   quem_convidou: string;
   faixa_etaria: 'Criança' | 'Adolescente (12-17)' | 'Jovem (18-29)' | 'Adulto' | 'Melhor Idade';
   quer_celula: boolean;
@@ -74,7 +77,7 @@ export interface CelulaMembro {
 export interface Celula {
   id: string;
   nome: string;
-  rede: 'Hype' | 'One Way' | 'Família' | 'Casais' | 'Adultos' | 'Geral';
+  rede: 'Homens' | 'Mulheres' | 'Hype' | 'One Way' | 'Casais' | 'Família' | 'Adultos' | 'Geral';
   lider_nome: string;
   lider_telefone: string;
   vice_lider_nome?: string;
