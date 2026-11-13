@@ -7,7 +7,7 @@ import { EventCard } from '../components/event/EventCard';
 import { EventCardSkeleton } from '../components/event/EventCardSkeleton';
 import { InscricaoModal } from '../components/form/InscricaoModal';
 import { Evento } from '../types/evento';
-import { SEED_EVENTOS } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { useAdminStore } from '../store/adminStore';
 import { animateCardsEntrance, animateHeroEntrance } from '../lib/animations';
 import {
@@ -28,8 +28,8 @@ import {
 
 export default function HomePage() {
   const { igrejaConfig, modoCor, setModoCor } = useAdminStore();
-  const [eventos] = useState<Evento[]>(SEED_EVENTOS);
-  const [loading] = useState<boolean>(false);
+  const [eventos, setEventos] = useState<Evento[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
   const [busca, setBusca] = useState<string>('');
   const [redeFiltro, setRedeFiltro] = useState<'Todas' | 'Hype' | 'One Way' | 'Padrão'>('Todas');
   const [eventoSelecionado, setEventoSelecionado] = useState<Evento | null>(null);
@@ -37,6 +37,44 @@ export default function HomePage() {
 
   const heroRef = useRef<HTMLElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+
+  // Carrega eventos do LocalStorage e do Supabase
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const salvos = localStorage.getItem('eira_eventos');
+        if (salvos) {
+          setEventos(JSON.parse(salvos));
+          setLoading(false);
+        }
+      } catch {}
+    }
+
+    async function buscarEventos() {
+      try {
+        const { data, error } = await supabase
+          .from('eventos')
+          .select('*')
+          .eq('ativo', true)
+          .order('data_inicio', { ascending: true });
+
+        if (data && !error) {
+          setEventos(data as Evento[]);
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem('eira_eventos', JSON.stringify(data));
+            } catch {}
+          }
+        }
+      } catch (err) {
+        console.warn('Erro ao carregar eventos do Supabase:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    buscarEventos();
+  }, []);
 
   // Animações GSAP de entrada sutis
   useEffect(() => {

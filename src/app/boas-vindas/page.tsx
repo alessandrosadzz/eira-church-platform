@@ -25,6 +25,9 @@ export default function BoasVindasPage() {
 
   const [nome, setNome] = useState('');
   const [sexo, setSexo] = useState<'Homem' | 'Mulher'>('Homem');
+  const [cultoOrigem, setCultoOrigem] = useState<
+    'Culto de Domingo (Adultos/Família)' | 'One Way (Jovens)' | 'Hype (Teens)' | 'Outro'
+  >('Culto de Domingo (Adultos/Família)');
   const [telefone, setTelefone] = useState('');
   const [bairro, setBairro] = useState('');
   const [endereco, setEndereco] = useState('');
@@ -32,6 +35,8 @@ export default function BoasVindasPage() {
   const [faixaEtaria, setFaixaEtaria] = useState<
     'Criança' | 'Adolescente (12-17)' | 'Jovem (18-29)' | 'Adulto' | 'Melhor Idade'
   >('Jovem (18-29)');
+  const [jaParticipaCelula, setJaParticipaCelula] = useState(false);
+  const [nomeCelulaAtual, setNomeCelulaAtual] = useState('');
   const [querCelula, setQuerCelula] = useState(true);
   const [pedidoOracao, setPedidoOracao] = useState('');
 
@@ -71,13 +76,16 @@ export default function BoasVindasPage() {
     adicionarVisitante({
       nome: nome.trim(),
       sexo,
+      culto_origem: cultoOrigem,
       telefone: telefone.trim(),
       bairro: bairro.trim() || 'Não informado',
       endereco: endereco.trim() || undefined,
       maps_url: mapsLink || undefined,
       quem_convidou: quemConvidou.trim() || 'Culto da Igreja',
       faixa_etaria: faixaEtaria,
-      quer_celula: querCelula,
+      ja_participa_celula: jaParticipaCelula,
+      nome_celula_atual: jaParticipaCelula ? nomeCelulaAtual.trim() : undefined,
+      quer_celula: jaParticipaCelula ? false : querCelula,
       pedido_oracao: pedidoOracao.trim() || undefined,
       data_visita: new Date().toISOString().split('T')[0],
       status: 'novo',
@@ -214,6 +222,40 @@ export default function BoasVindasPage() {
             </div>
           </div>
 
+          {/* De qual Culto você participou hoje? */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold uppercase tracking-tight text-[#0A0A0A]">
+              De qual culto você participou hoje?
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {[
+                { id: 'Culto de Domingo (Adultos/Família)', label: '🏛️ Culto de Domingo (Família)', desc: 'Celebração de Domingo' },
+                { id: 'One Way (Jovens)', label: '🔥 One Way (Jovens)', desc: 'Culto de Sábado 19h30' },
+                { id: 'Hype (Teens)', label: '⚡ Hype (Adolescentes)', desc: 'Rede de Teens' },
+                { id: 'Outro', label: '✨ Outro Encontro / Evento', desc: 'Culto Especial ou Retiro' },
+              ].map((c) => {
+                const ativo = cultoOrigem === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setCultoOrigem(c.id as any)}
+                    className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${
+                      ativo
+                        ? 'bg-black text-[var(--accent,#FACC15)] border-black shadow-sm font-bold'
+                        : 'bg-[#FAFAFA] text-[#0A0A0A] border-[#E4E4E7] hover:border-black'
+                    }`}
+                  >
+                    <p className="text-xs font-bold">{c.label}</p>
+                    <span className={`text-[10px] ${ativo ? 'text-[#D4D4D8]' : 'text-[#71717A]'}`}>
+                      {c.desc}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <Input
             label="Seu WhatsApp com DDD"
             required
@@ -297,21 +339,63 @@ export default function BoasVindasPage() {
               </select>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-tight text-[#0A0A0A] mb-1.5">
-                Gostaria de conhecer uma célula?
+            <div className="md:col-span-2 space-y-3 pt-2 border-t border-[#F4F4F5]">
+              <label className="block text-xs font-bold uppercase tracking-tight text-[#0A0A0A]">
+                Você já faz parte de alguma célula da {igrejaConfig.nome}?
               </label>
-              <button
-                type="button"
-                onClick={() => setQuerCelula(!querCelula)}
-                className={`w-full h-12 px-3 rounded-lg border text-xs font-bold flex items-center justify-center space-x-2 transition-colors cursor-pointer ${
-                  querCelula
-                    ? 'bg-[#DCFCE7] text-[#166534] border-[#BBF7D0]'
-                    : 'bg-[#F4F4F5] text-[#71717A] border-[#E4E4E7]'
-                }`}
-              >
-                <span>{querCelula ? '✓ Sim, adoraria conhecer!' : 'Agora não'}</span>
-              </button>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setJaParticipaCelula(false);
+                    setQuerCelula(true);
+                  }}
+                  className={`p-3.5 rounded-lg border text-left transition-all cursor-pointer ${
+                    !jaParticipaCelula
+                      ? 'bg-black text-[var(--accent,#FACC15)] border-black shadow-sm font-bold'
+                      : 'bg-[#FAFAFA] text-[#71717A] border-[#E4E4E7] hover:border-black'
+                  }`}
+                >
+                  <p className="text-xs font-bold">Não participo de célula ainda</p>
+                  <span className={`text-[10px] ${!jaParticipaCelula ? 'text-[#D4D4D8]' : 'text-[#71717A]'}`}>
+                    Gostaria de conhecer um grupo pertinho de mim
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setJaParticipaCelula(true);
+                    setQuerCelula(false);
+                  }}
+                  className={`p-3.5 rounded-lg border text-left transition-all cursor-pointer ${
+                    jaParticipaCelula
+                      ? 'bg-black text-[var(--accent,#FACC15)] border-black shadow-sm font-bold'
+                      : 'bg-[#FAFAFA] text-[#71717A] border-[#E4E4E7] hover:border-black'
+                  }`}
+                >
+                  <p className="text-xs font-bold">Sim, já faço parte de uma célula</p>
+                  <span className={`text-[10px] ${jaParticipaCelula ? 'text-[#D4D4D8]' : 'text-[#71717A]'}`}>
+                    Já sou membro integrado de uma célula
+                  </span>
+                </button>
+              </div>
+
+              {jaParticipaCelula ? (
+                <div className="pt-1">
+                  <Input
+                    label="Qual é a sua célula ou quem é seu líder?"
+                    value={nomeCelulaAtual}
+                    onChange={(e) => setNomeCelulaAtual(e.target.value)}
+                    placeholder="Ex: Célula One Way Centro ou Líder André"
+                  />
+                </div>
+              ) : (
+                <div className="p-3 rounded-lg bg-[#DCFCE7]/70 border border-[#BBF7D0] text-xs text-[#166534] flex items-center justify-between">
+                  <span>✨ Excelente! Nossa liderança vai te indicar uma célula acolhedora na sua região.</span>
+                </div>
+              )}
             </div>
           </div>
 

@@ -9,7 +9,7 @@ import { Input } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
 import { Button } from '../ui/Button';
 import { useToast } from '../../hooks/useToast';
-import { Check, Calendar, MapPin, Image, Link, ShieldCheck } from 'lucide-react';
+import { Check, Calendar, MapPin, Image, Link, ShieldCheck, Upload } from 'lucide-react';
 
 export interface EventoFormProps {
   eventoInicial?: Evento | null;
@@ -47,9 +47,26 @@ export const EventoForm: React.FC<EventoFormProps> = ({
   const [vagas, setVagas] = useState<number>(eventoInicial?.vagas || 100);
   const [valor, setValor] = useState<number>(eventoInicial?.valor || 0);
   const [categoria, setCategoria] = useState<CategoriaEvento>(eventoInicial?.categoria || 'Acampamento');
+  const [categoriaPersonalizada, setCategoriaPersonalizada] = useState('');
   const [rede, setRede] = useState<'Hype' | 'One Way' | 'Padrão'>(eventoInicial?.rede || 'Hype');
   const [localNome, setLocalNome] = useState(eventoInicial?.local_nome || 'Auditório Principal — Eira Church');
   const [imagemUrl, setImagemUrl] = useState(eventoInicial?.imagem_url || '');
+
+  const handleUploadBanner = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      erro('A imagem do evento deve ter no máximo 5MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      setImagemUrl(dataUrl);
+      sucesso('Upload da imagem do evento realizado com sucesso!');
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Chips de campos selecionados
   const [camposSelecionados, setCamposSelecionados] = useState<CampoDisponivel[]>(
@@ -135,7 +152,9 @@ export const EventoForm: React.FC<EventoFormProps> = ({
         data_fim: dataFim || null,
         vagas: Number(vagas),
         valor: Number(valor),
-        categoria,
+        categoria: (categoria === 'Outro' && categoriaPersonalizada.trim()
+          ? categoriaPersonalizada.trim()
+          : categoria) as any,
         rede,
         campos: camposSelecionados,
         local_nome: localNome.trim(),
@@ -212,8 +231,8 @@ export const EventoForm: React.FC<EventoFormProps> = ({
           </select>
         </div>
 
-        <div>
-          <label className="block text-xs font-bold uppercase tracking-tight text-[#0A0A0A] mb-1.5">
+        <div className="space-y-2">
+          <label className="block text-xs font-bold uppercase tracking-tight text-[#0A0A0A]">
             Categoria do Evento
           </label>
           <select
@@ -225,8 +244,20 @@ export const EventoForm: React.FC<EventoFormProps> = ({
             <option value="Conferência">Conferência</option>
             <option value="Encontro">Encontro Especial</option>
             <option value="Culto especial">Culto Especial</option>
-            <option value="Outro">Outro</option>
+            <option value="Outro">Outro (Especificar)</option>
           </select>
+
+          {categoria === 'Outro' && (
+            <div className="pt-1">
+              <Input
+                label="Digite o Nome da Nova Categoria"
+                required
+                value={categoriaPersonalizada}
+                onChange={(e) => setCategoriaPersonalizada(e.target.value)}
+                placeholder="Ex: Noite de Louvor, Batismo, Café com Pastores..."
+              />
+            </div>
+          )}
         </div>
 
         {/* Datas */}
@@ -266,20 +297,65 @@ export const EventoForm: React.FC<EventoFormProps> = ({
           helperText={valor === 0 ? '✓ Evento gratuito (sem cobrança)' : undefined}
         />
 
-        {/* Local e Imagem */}
-        <Input
-          label="Local do Evento"
-          value={localNome}
-          onChange={(e) => setLocalNome(e.target.value)}
-          placeholder="Ex: Sítio das Palmeiras ou Auditório Eira"
-        />
+        {/* Local do Evento com Google Maps Integrado */}
+        <div className="space-y-1.5">
+          <Input
+            label="Local do Evento (com Integração Google Maps)"
+            value={localNome}
+            onChange={(e) => setLocalNome(e.target.value)}
+            placeholder="Ex: Auditório Eira Church, Rua Paraná 1500 ou Sítio das Palmeiras"
+          />
+          {localNome.trim() && (
+            <div className="flex items-center justify-between text-xs pt-0.5">
+              <a
+                href={`https://maps.google.com/?q=${encodeURIComponent(localNome)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center space-x-1.5 text-blue-600 hover:text-blue-800 font-bold hover:underline"
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                <span>🗺️ Abrir localização no Google Maps ↗</span>
+              </a>
+              <span className="text-[#71717A] text-[11px]">Link gerado automaticamente</span>
+            </div>
+          )}
+        </div>
 
-        <Input
-          label="URL da Imagem do Banner (16:9)"
-          value={imagemUrl}
-          onChange={(e) => setImagemUrl(e.target.value)}
-          placeholder="https://..."
-        />
+        {/* Banner do Evento com URL ou Upload Direto */}
+        <div className="space-y-1.5">
+          <Input
+            label="Banner do Evento (16:9)"
+            value={imagemUrl}
+            onChange={(e) => setImagemUrl(e.target.value)}
+            placeholder="Cole o link da imagem ou faça upload abaixo"
+          />
+          <div className="flex items-center space-x-3 pt-1">
+            <label className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#F4F4F5] border border-[#E4E4E7] hover:border-black cursor-pointer transition-colors text-[#0A0A0A]">
+              <Upload className="w-3.5 h-3.5" />
+              <span>Fazer upload da Imagem</span>
+              <input
+                type="file"
+                accept="image/png, image/jpeg, image/webp"
+                onChange={handleUploadBanner}
+                className="hidden"
+              />
+            </label>
+            {imagemUrl && (
+              <button
+                type="button"
+                onClick={() => setImagemUrl('')}
+                className="text-xs text-[#DC2626] hover:underline"
+              >
+                Remover Imagem
+              </button>
+            )}
+          </div>
+          {imagemUrl && (
+            <div className="mt-2 relative w-full aspect-video rounded-lg overflow-hidden border border-[#E4E4E7] bg-black max-w-xs shadow-xs">
+              <img src={imagemUrl} alt="Preview do Banner" className="w-full h-full object-cover" />
+            </div>
+          )}
+        </div>
 
         {/* Descrição */}
         <div className="md:col-span-2">

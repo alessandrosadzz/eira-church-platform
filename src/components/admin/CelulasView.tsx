@@ -24,6 +24,7 @@ import {
   Shield,
   Droplets,
   Share2,
+  Pencil,
 } from 'lucide-react';
 
 export const CelulasView: React.FC = () => {
@@ -33,6 +34,7 @@ export const CelulasView: React.FC = () => {
     adicionarCelula,
     removerCelula,
     adicionarMembroCelula,
+    editarMembroCelula,
     removerMembroCelula,
     toggleBatismoMembro,
     usuarioRole,
@@ -44,6 +46,55 @@ export const CelulasView: React.FC = () => {
   // Modais
   const [modalNovaCelula, setModalNovaCelula] = useState(false);
   const [celulaSelecionada, setCelulaSelecionada] = useState<Celula | null>(null);
+
+  // Modal e Formulário de Edição de Membro
+  const [membroParaEditar, setMembroParaEditar] = useState<{
+    celulaId: string;
+    membro: CelulaMembro;
+  } | null>(null);
+  const [editNome, setEditNome] = useState('');
+  const [editTel, setEditTel] = useState('');
+  const [editFuncao, setEditFuncao] = useState<CelulaMembro['funcao']>('Membro');
+  const [editTempo, setEditTempo] = useState('Recém-chegado');
+  const [editBatizado, setEditBatizado] = useState(false);
+
+  const abrirEdicaoMembro = (celulaId: string, m: CelulaMembro) => {
+    setMembroParaEditar({ celulaId, membro: m });
+    setEditNome(m.nome);
+    setEditTel(m.telefone);
+    setEditFuncao(m.funcao);
+    setEditTempo(m.tempo_celula);
+    setEditBatizado(m.batizado);
+  };
+
+  const handleSalvarEdicaoMembro = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!membroParaEditar) return;
+    if (!editNome.trim()) {
+      info('Informe o nome do integrante.');
+      return;
+    }
+    const dadosAtualizados: Partial<CelulaMembro> = {
+      nome: editNome.trim(),
+      telefone: editTel.trim(),
+      funcao: editFuncao,
+      tempo_celula: editTempo,
+      batizado: editBatizado,
+    };
+    editarMembroCelula(membroParaEditar.celulaId, membroParaEditar.membro.id, dadosAtualizados);
+    setCelulaSelecionada((prev) =>
+      prev
+        ? {
+            ...prev,
+            membros: prev.membros.map((x) =>
+              x.id === membroParaEditar.membro.id ? { ...x, ...dadosAtualizados } : x
+            ),
+          }
+        : null
+    );
+    sucesso(`Dados de ${editNome} atualizados com sucesso!`);
+    setMembroParaEditar(null);
+  };
 
   // Form Nova Célula
   const [novaNome, setNovaNome] = useState('');
@@ -523,6 +574,16 @@ export const CelulasView: React.FC = () => {
                         )}
                       </button>
 
+                      {/* Botão de Edição dos Dados do Membro */}
+                      <button
+                        type="button"
+                        onClick={() => abrirEdicaoMembro(celulaSelecionada.id, m)}
+                        className="p-1.5 text-[#52525B] hover:text-black hover:bg-[#E4E4E7] rounded-md transition-colors"
+                        title="Editar dados e telefone do integrante"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+
                       {m.funcao !== 'Líder' && (
                         <button
                           type="button"
@@ -748,6 +809,135 @@ export const CelulasView: React.FC = () => {
                 </Button>
                 <Button type="submit" variant="primary">
                   Cadastrar Célula
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* MODAL: EDITAR INTEGRANTE DA CÉLULA */}
+      {/* ==================================================== */}
+      {membroParaEditar && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-white rounded-[var(--radius-box,0.75rem)] border border-[#E4E4E7] shadow-modal overflow-hidden">
+            <div className="p-5 border-b border-[#E4E4E7] flex items-center justify-between bg-[#FAFAFA]">
+              <div className="flex items-center space-x-2">
+                <div className="p-1.5 rounded-lg bg-[var(--accent,#FACC15)] text-black">
+                  <Pencil className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-[#0A0A0A]">
+                    Editar Integrante
+                  </h3>
+                  <p className="text-xs text-[#71717A]">
+                    Atualize os dados e telefone de {membroParaEditar.membro.nome}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setMembroParaEditar(null)}
+                className="text-[#71717A] hover:text-black font-bold px-2 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSalvarEdicaoMembro} className="p-5 space-y-4 text-left">
+              <Input
+                label="Nome Completo"
+                required
+                value={editNome}
+                onChange={(e) => setEditNome(e.target.value)}
+                placeholder="Ex: João da Silva"
+              />
+
+              <Input
+                label="Telefone / WhatsApp"
+                value={editTel}
+                onChange={(e) => setEditTel(e.target.value)}
+                placeholder="(45) 99999-9999"
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-tight text-[#0A0A0A] mb-1.5">
+                    Função na Célula
+                  </label>
+                  <select
+                    value={editFuncao}
+                    onChange={(e) => setEditFuncao(e.target.value as any)}
+                    className="w-full h-11 px-3 rounded-lg bg-white border border-[#E4E4E7] text-xs font-medium text-[#0A0A0A] focus:outline-none focus:ring-2 focus:ring-black"
+                  >
+                    <option value="Membro">Membro</option>
+                    <option value="Líder">Líder</option>
+                    <option value="Vice-líder">Vice-líder</option>
+                    <option value="Anfitrião">Anfitrião</option>
+                    <option value="Líder em Treinamento">Líder em Treinamento</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-tight text-[#0A0A0A] mb-1.5">
+                    Tempo na Célula
+                  </label>
+                  <select
+                    value={editTempo}
+                    onChange={(e) => setEditTempo(e.target.value)}
+                    className="w-full h-11 px-3 rounded-lg bg-white border border-[#E4E4E7] text-xs font-medium text-[#0A0A0A] focus:outline-none focus:ring-2 focus:ring-black"
+                  >
+                    <option value="Recém-chegado">Recém-chegado</option>
+                    <option value="3 meses">3 meses</option>
+                    <option value="6 meses">6 meses</option>
+                    <option value="1 ano+">1 ano ou mais</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Status de Batismo */}
+              <div className="pt-2">
+                <label className="block text-xs font-bold uppercase tracking-tight text-[#0A0A0A] mb-1.5">
+                  Batismo nas Águas
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditBatizado(true)}
+                    className={`py-2 px-3 rounded-lg border text-xs font-bold transition-all ${
+                      editBatizado
+                        ? 'bg-[#DCFCE7] text-[#166534] border-[#BBF7D0] ring-1 ring-[#166534]'
+                        : 'bg-[#FAFAFA] text-[#71717A] border-[#E4E4E7] hover:border-black'
+                    }`}
+                  >
+                    ✓ Batizado(a)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditBatizado(false)}
+                    className={`py-2 px-3 rounded-lg border text-xs font-bold transition-all ${
+                      !editBatizado
+                        ? 'bg-[#FEF2F2] text-[#991B1B] border-[#FECACA] ring-1 ring-[#991B1B]'
+                        : 'bg-[#FAFAFA] text-[#71717A] border-[#E4E4E7] hover:border-black'
+                    }`}
+                  >
+                    ✕ Não batizado(a)
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-[#E4E4E7] flex items-center justify-end space-x-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setMembroParaEditar(null)}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" variant="primary">
+                  Salvar Alterações
                 </Button>
               </div>
             </form>

@@ -1,21 +1,71 @@
 // src/app/evento/[slug]/page.tsx
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { EventHero } from '../../../components/event/EventHero';
 import { InscricaoForm } from '../../../components/form/InscricaoForm';
-import { SEED_EVENTOS } from '../../../lib/supabase';
-import { ArrowLeft, Church } from 'lucide-react';
+import { supabase } from '../../../lib/supabase';
+import { Evento } from '../../../types/evento';
+import { ArrowLeft, Church, Loader2 } from 'lucide-react';
 
 export default function EventoSlugPage() {
   const params = useParams();
   const slug = params?.slug as string;
 
-  const evento = useMemo(() => {
-    return SEED_EVENTOS.find((ev) => ev.slug === slug);
+  const [evento, setEvento] = useState<Evento | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (!slug) return;
+
+    // 1. Tenta carregar do cache local imediatamente para exibição ultra rápida
+    if (typeof window !== 'undefined') {
+      try {
+        const salvos = localStorage.getItem('eira_eventos');
+        if (salvos) {
+          const lista: Evento[] = JSON.parse(salvos);
+          const encontrado = lista.find((ev) => ev.slug === slug);
+          if (encontrado) {
+            setEvento(encontrado);
+            setLoading(false);
+          }
+        }
+      } catch {}
+    }
+
+    // 2. Consulta no Supabase para pegar a versão oficial mais recente
+    async function carregarDoSupabase() {
+      try {
+        const { data, error } = await supabase
+          .from('eventos')
+          .select('*')
+          .eq('slug', slug)
+          .eq('ativo', true)
+          .single();
+
+        if (data && !error) {
+          setEvento(data as Evento);
+        }
+      } catch (err) {
+        console.error('Erro ao buscar evento no Supabase:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    carregarDoSupabase();
   }, [slug]);
+
+  if (loading && !evento) {
+    return (
+      <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center p-6 text-center space-y-4">
+        <Loader2 className="w-8 h-8 text-[var(--accent,#FACC15)] animate-spin" />
+        <p className="text-xs text-[#A1A1AA]">Carregando informações do evento...</p>
+      </div>
+    );
+  }
 
   if (!evento) {
     return (

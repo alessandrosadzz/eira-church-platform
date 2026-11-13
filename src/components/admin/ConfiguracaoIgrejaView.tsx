@@ -48,6 +48,7 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
   const [slogan, setSlogan] = useState(igrejaConfig.slogan);
   const [logoUrl, setLogoUrl] = useState(igrejaConfig.logoUrl || '');
   const [bannerUrl, setBannerUrl] = useState(igrejaConfig.bannerUrl || '');
+  const [faviconUrl, setFaviconUrl] = useState(igrejaConfig.faviconUrl || '');
 
   // Endereço
   const [logradouro, setLogradouro] = useState(igrejaConfig.endereco.logradouro);
@@ -99,6 +100,22 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
       const dataUrl = event.target?.result as string;
       setBannerUrl(dataUrl);
       sucesso('Upload do banner realizado com sucesso!');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleUploadFavicon = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 1 * 1024 * 1024) {
+      erro('O arquivo de favicon deve ter no máximo 1MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      setFaviconUrl(dataUrl);
+      sucesso('Upload do favicon realizado com sucesso!');
     };
     reader.readAsDataURL(file);
   };
@@ -166,6 +183,7 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
       slogan: slogan.trim(),
       logoUrl: logoUrl.trim() || undefined,
       bannerUrl: bannerUrl.trim() || undefined,
+      faviconUrl: faviconUrl.trim() || undefined,
       endereco: {
         logradouro: logradouro.trim(),
         bairro: bairro.trim(),
@@ -494,11 +512,58 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
               )}
             </div>
           </div>
+
+          {/* Favicon da Aba do Navegador: URL ou Upload */}
+          <div className="space-y-1.5 md:col-span-2 pt-2 border-t border-[#F4F4F5]">
+            <Input
+              label="Favicon da Página (Ícone exibido na aba do navegador)"
+              value={faviconUrl}
+              onChange={(e) => setFaviconUrl(e.target.value)}
+              placeholder="https://sua-igreja.com/favicon.png ou faça upload abaixo"
+            />
+            <div className="flex items-center space-x-3 pt-1">
+              <label className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#F4F4F5] border border-[#E4E4E7] hover:border-black cursor-pointer transition-colors text-[#0A0A0A]">
+                <Upload className="w-3.5 h-3.5" />
+                <span>Fazer upload do Favicon (.png, .ico, .svg)</span>
+                <input
+                  type="file"
+                  accept="image/png, image/x-icon, image/vnd.microsoft.icon, image/svg+xml, image/jpeg"
+                  onChange={handleUploadFavicon}
+                  className="hidden"
+                />
+              </label>
+              {faviconUrl && (
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 rounded-lg border border-[#E4E4E7] bg-white p-1 flex items-center justify-center shadow-xs">
+                    <img src={faviconUrl} alt="Preview Favicon" className="w-5 h-5 object-contain" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFaviconUrl('')}
+                    className="text-xs text-[#DC2626] hover:underline"
+                  >
+                    Remover
+                  </button>
+                </div>
+              )}
+            </div>
+            <p className="text-[11px] text-[#71717A]">
+              Recomendado: imagem quadrada (.png ou .ico), com resolução de 32x32 ou 64x64 pixels.
+            </p>
+          </div>
         </div>
 
-        {/* Previews rápidos de Logo e Banner */}
-        {(logoUrl || bannerUrl) && (
+        {/* Previews rápidos de Logo, Banner e Favicon */}
+        {(logoUrl || bannerUrl || faviconUrl) && (
           <div className="p-4 rounded-lg bg-[#FAFAFA] border border-[#E4E4E7] flex flex-wrap items-center gap-4">
+            {faviconUrl && (
+              <div className="flex items-center space-x-2">
+                <span className="text-xs text-[#71717A]">Favicon:</span>
+                <div className="w-8 h-8 rounded border border-[#D4D4D8] bg-white p-1 flex items-center justify-center shadow-xs">
+                  <img src={faviconUrl} alt="Favicon" className="w-5 h-5 object-contain" />
+                </div>
+              </div>
+            )}
             {logoUrl && (
               <div className="space-y-1">
                 <span className="text-[10px] font-bold text-[#71717A] uppercase">Preview Logo:</span>

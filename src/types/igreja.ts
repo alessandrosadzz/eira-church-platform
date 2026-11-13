@@ -33,6 +33,7 @@ export interface IgrejaConfig {
   slogan: string;
   logoUrl?: string;
   bannerUrl?: string;
+  faviconUrl?: string;
   endereco: {
     logradouro: string;
     bairro: string;
@@ -52,11 +53,14 @@ export interface VisitanteConexao {
   nome: string;
   sexo: 'Homem' | 'Mulher' | 'Casal';
   telefone: string;
+  culto_origem?: 'Culto de Domingo (Adultos/Família)' | 'One Way (Jovens)' | 'Hype (Teens)' | 'Outro';
   bairro: string;
   endereco?: string;
   maps_url?: string;
   quem_convidou: string;
   faixa_etaria: 'Criança' | 'Adolescente (12-17)' | 'Jovem (18-29)' | 'Adulto' | 'Melhor Idade';
+  ja_participa_celula?: boolean;
+  nome_celula_atual?: string;
   quer_celula: boolean;
   pedido_oracao?: string;
   data_visita: string;

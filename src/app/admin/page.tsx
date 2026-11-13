@@ -15,7 +15,7 @@ import { CelulasView } from '../../components/admin/CelulasView';
 import { ConfiguracaoIgrejaView } from '../../components/admin/ConfiguracaoIgrejaView';
 import { Evento } from '../../types/evento';
 import { Inscricao, MetodoPagamento } from '../../types/inscricao';
-import { SEED_EVENTOS, SEED_INSCRICOES } from '../../lib/supabase';
+import { SEED_EVENTOS, SEED_INSCRICOES, supabase } from '../../lib/supabase';
 import { formatarMoeda, formatarDataCurta } from '../../lib/formatters';
 import { exportarCsvInscricoes } from '../../lib/exportCsv';
 import { useToast } from '../../hooks/useToast';
@@ -40,6 +40,13 @@ import {
   EyeOff,
   ShieldCheck,
   LogIn,
+  Sparkles,
+  TrendingUp,
+  Droplets,
+  HelpCircle,
+  Send,
+  Info,
+  CalendarCheck,
 } from 'lucide-react';
 
 export default function AdminPage() {
@@ -135,9 +142,49 @@ export default function AdminPage() {
     info('Você encerrou a sessão no painel.');
   };
 
-  // Estado dos Dados
+  // Estado dos Dados com Persistência
   const [eventos, setEventos] = useState<Evento[]>(SEED_EVENTOS);
   const [inscricoes, setInscricoes] = useState<Inscricao[]>(SEED_INSCRICOES);
+
+  // Filtro Temporal de Pessoas e Frequência (Pastores e Admins)
+  const [filtroPeriodo, setFiltroPeriodo] = useState<
+    'hoje' | 'mes_atual' | 'mes_passado' | 'ano' | 'todos'
+  >('mes_atual');
+
+  // Modal Central de Atualizações e Novidades da Plataforma
+  const [modalAtualizacoesAberto, setModalAtualizacoesAberto] = useState(false);
+
+  // Carrega Eventos do LocalStorage e do Supabase
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const salvos = localStorage.getItem('eira_eventos');
+        if (salvos) setEventos(JSON.parse(salvos));
+      } catch {}
+    }
+
+    async function buscarEventos() {
+      try {
+        const { data, error } = await supabase
+          .from('eventos')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (data && !error) {
+          setEventos(data as Evento[]);
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem('eira_eventos', JSON.stringify(data));
+            } catch {}
+          }
+        }
+      } catch (err) {
+        console.warn('Erro ao carregar eventos:', err);
+      }
+    }
+
+    buscarEventos();
+  }, []);
 
   // Modal de Baixa Manual
   const [inscricaoParaBaixa, setInscricaoParaBaixa] = useState<Inscricao | null>(null);
@@ -159,7 +206,7 @@ export default function AdminPage() {
     }
   }, [abaAtiva]);
 
-  // Métricas Consolidadas
+  // Métricas Consolidadas de Inscrições
   const metricas = useMemo(() => {
     const total = inscricoes.length;
     const confirmados = inscricoes.filter((i) => i.status !== 'pendente').length;
@@ -170,6 +217,63 @@ export default function AdminPage() {
 
     return { total, confirmados, pendentes, receita };
   }, [inscricoes]);
+
+  // Métricas Consolidadas de Células
+  const totalMembrosCelulas = useMemo(() => {
+    return celulas.reduce((acc, c) => acc + (c.membros?.length || 0), 0);
+  }, [celulas]);
+
+  const totalBatizadosCelulas = useMemo(() => {
+    return celulas.reduce(
+      (acc, c) => acc + (c.membros?.filter((m) => m.batizado)?.length || 0),
+      0
+    );
+  }, [celulas]);
+
+  const percentualBatizados =
+    totalMembrosCelulas > 0
+      ? Math.round((totalBatizadosCelulas / totalMembrosCelulas) * 100)
+      : 0;
+
+  // Visitantes Filtrados pelo Período Selecionado
+  const visitantesNoPeriodo = useMemo(() => {
+    const hoje = new Date().toISOString().split('T')[0];
+    const agora = new Date();
+    const anoAtual = agora.getFullYear();
+    const mesAtual = agora.getMonth();
+
+    return visitantes.filter((v) => {
+      if (filtroPeriodo === 'todos') return true;
+      const dataStr = v.data_visita || hoje;
+      const dataV = new Date(dataStr);
+
+      if (filtroPeriodo === 'hoje') {
+        return dataStr === hoje;
+      }
+      if (filtroPeriodo === 'mes_atual') {
+        return (
+          dataV.getFullYear() === anoAtual && dataV.getMonth() === mesAtual
+        );
+      }
+      if (filtroPeriodo === 'mes_passado') {
+        const mesPassado = mesAtual === 0 ? 11 : mesAtual - 1;
+        const anoDoMesPassado = mesAtual === 0 ? anoAtual - 1 : anoAtual;
+        return (
+          dataV.getFullYear() === anoDoMesPassado &&
+          dataV.getMonth() === mesPassado
+        );
+      }
+      if (filtroPeriodo === 'ano') {
+        return dataV.getFullYear() === anoAtual;
+      }
+      return true;
+    });
+  }, [visitantes, filtroPeriodo]);
+
+  // Total de Pessoas com a gente na Igreja (Membros de células + visitantes da Conexão)
+  const totalPessoasNaIgreja = useMemo(() => {
+    return totalMembrosCelulas + visitantes.length;
+  }, [totalMembrosCelulas, visitantes]);
 
   // Filtragem de Inscrições
   const inscricoesFiltradas = useMemo(() => {
@@ -214,33 +318,72 @@ export default function AdminPage() {
   };
 
   const handleSalvarEvento = async (novoEvento: Partial<Evento>) => {
+    let listaAtualizada: Evento[];
+    let eventoSalvo: Evento;
+
     if (novoEvento.id) {
       // Edição
-      setEventos((prev) =>
-        prev.map((ev) => (ev.id === novoEvento.id ? ({ ...ev, ...novoEvento } as Evento) : ev))
+      listaAtualizada = eventos.map((ev) =>
+        ev.id === novoEvento.id
+          ? ({ ...ev, ...novoEvento, updated_at: new Date().toISOString() } as Evento)
+          : ev
       );
+      eventoSalvo = listaAtualizada.find((e) => e.id === novoEvento.id)!;
     } else {
       // Novo
-      const eventoCriado: Evento = {
+      eventoSalvo = {
         ...novoEvento,
-        id: Math.random().toString(36).substring(2, 10),
+        id: crypto.randomUUID ? crypto.randomUUID() : `ev-${Date.now()}`,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         total_inscritos: 0,
         inscritos_confirmados: 0,
         vagas_restantes: novoEvento.vagas || 100,
         receita_confirmada: 0,
+        ativo: true,
       } as Evento;
 
-      setEventos((prev) => [eventoCriado, ...prev]);
+      listaAtualizada = [eventoSalvo, ...eventos];
+    }
+
+    setEventos(listaAtualizada);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('eira_eventos', JSON.stringify(listaAtualizada));
+      } catch {}
+    }
+
+    // Salva no Supabase
+    try {
+      await supabase.from('eventos').upsert({
+        id: eventoSalvo.id,
+        slug: eventoSalvo.slug,
+        nome: eventoSalvo.nome,
+        descricao: eventoSalvo.descricao,
+        data_inicio: eventoSalvo.data_inicio,
+        data_fim: eventoSalvo.data_fim,
+        vagas: eventoSalvo.vagas,
+        valor: eventoSalvo.valor,
+        categoria: eventoSalvo.categoria,
+        rede: eventoSalvo.rede,
+        campos: eventoSalvo.campos,
+        ativo: eventoSalvo.ativo,
+        imagem_url: eventoSalvo.imagem_url,
+        local_nome: eventoSalvo.local_nome,
+        updated_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn('Erro ao salvar no Supabase:', err);
     }
 
     setEventoParaEditar(null);
     setAbaAtiva('eventos');
+    sucesso(`Evento "${eventoSalvo.nome}" salvo! Link direto: /evento/${eventoSalvo.slug}`);
   };
 
   const copiarLinkEvento = (slug: string) => {
-    const url = `${window.location.origin}/evento/${slug}`;
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://eira-church-app.vercel.app';
+    const url = `${origin}/evento/${slug}`;
     if (typeof navigator !== 'undefined') {
       navigator.clipboard.writeText(url);
       sucesso('Link do evento copiado para a área de transferência!');
@@ -363,64 +506,314 @@ export default function AdminPage() {
                 ref={heroRef}
                 className="relative w-full rounded-[var(--radius-box,0.75rem)] bg-[#0A0A0A] text-white p-6 sm:p-8 overflow-hidden shadow-sm border border-black"
               >
-                <div className="relative z-10 max-w-3xl space-y-2 text-left">
-                  <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-md text-xs font-black bg-[var(--accent,#FACC15)] text-[var(--accent-text,#000000)]">
-                    <span>VISÃO INTEGRADA DA IGREJA</span>
+                <div className="relative z-10 max-w-3xl space-y-3 text-left">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-md text-xs font-black bg-[var(--accent,#FACC15)] text-[var(--accent-text,#000000)]">
+                      <span>VISÃO INTEGRADA DA IGREJA</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setModalAtualizacoesAberto(true)}
+                      className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-md text-xs font-bold bg-[#27272A] text-[var(--accent,#FACC15)] hover:bg-[#3F3F46] border border-[#3F3F46] transition-colors cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>O Que Há de Novo & Atualizações ↗</span>
+                    </button>
                   </div>
+
                   <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-                    Painel de Liderança // {igrejaConfig.nome}
+                    Painel {usuarioRole === 'lider' ? 'da Liderança de Célula' : 'Pastoral & Administrativo'} // {igrejaConfig.nome}
                   </h2>
                   <p className="text-xs sm:text-sm text-[#A1A1AA] leading-relaxed">
-                    {igrejaConfig.slogan}. Acompanhe inscrições em eventos, vagas em tempo real, visitantes acolhidos pela Conexão e rede de células.
+                    {igrejaConfig.slogan}. Acompanhe almas acolhidas, rede de células, frequência e a expansão do Reino de Deus.
                   </p>
                 </div>
                 <div className="absolute right-0 bottom-0 top-0 w-1/3 bg-gradient-to-l from-[var(--accent,#FACC15)]/10 to-transparent pointer-events-none" />
               </div>
 
-              {/* Cards de Métricas Consolidadas */}
-              <div ref={cardsRef} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <MetricCard
-                  titulo="Total de Inscritos"
-                  valor={metricas.total}
-                  subtexto="Todas as redes ativas"
-                  icone={Users}
-                />
-                <MetricCard
-                  titulo="Confirmados"
-                  valor={metricas.confirmados}
-                  subtexto={`${
-                    metricas.total > 0
-                      ? Math.round((metricas.confirmados / metricas.total) * 100)
-                      : 0
-                  }% de conversão`}
-                  icone={CheckCircle2}
-                />
-                <MetricCard
-                  titulo="Pagamentos Pendentes"
-                  valor={metricas.pendentes}
-                  subtexto="Aguardando Pix ou balcão"
-                  icone={Clock}
-                />
+              {/* Central de Acesso Rápido para o Culto e Recepção */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-4 rounded-xl bg-white border border-[#E4E4E7] shadow-xs flex items-center justify-between">
+                  <div className="space-y-0.5 text-left">
+                    <p className="text-xs font-extrabold text-[#0A0A0A]">Ficha de Boas-Vindas</p>
+                    <p className="text-[11px] text-[#71717A]">Para a equipe de recepção no culto</p>
+                  </div>
+                  <div className="flex items-center space-x-1.5">
+                    <a
+                      href="/boas-vindas"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-[#F4F4F5] hover:bg-[#E4E4E7] text-[#0A0A0A] transition-colors"
+                    >
+                      Abrir ↗
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+                        navigator.clipboard.writeText(`${origin}/boas-vindas`);
+                        sucesso('Link da Ficha de Boas-Vindas copiado!');
+                      }}
+                      className="p-1.5 rounded-lg text-xs font-bold bg-[#0A0A0A] text-[var(--accent,#FACC15)] hover:bg-[#27272A] transition-colors"
+                      title="Copiar link"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
 
-                {/* Exibição condicional da Receita: apenas Pastores e Admins têm acesso financeiro */}
-                {podeAcessarFinancas ? (
-                  <MetricCard
-                    titulo="Receita Confirmada"
-                    valor={formatarMoeda(metricas.receita)}
-                    subtexto="Pix, cartão e balcão"
-                    icone={DollarSign}
-                    destaque
-                  />
-                ) : (
-                  <MetricCard
-                    titulo="Rede de Células"
-                    valor={celulas.length}
-                    subtexto="Grupos em multiplicação"
-                    icone={Home}
-                    destaque
-                  />
-                )}
+                <div className="p-4 rounded-xl bg-white border border-[#E4E4E7] shadow-xs flex items-center justify-between">
+                  <div className="space-y-0.5 text-left">
+                    <p className="text-xs font-extrabold text-[#0A0A0A]">Cadastro de Líder</p>
+                    <p className="text-[11px] text-[#71717A]">Link para novos líderes de célula</p>
+                  </div>
+                  <div className="flex items-center space-x-1.5">
+                    <a
+                      href="/cadastro-lider"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-[#F4F4F5] hover:bg-[#E4E4E7] text-[#0A0A0A] transition-colors"
+                    >
+                      Abrir ↗
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+                        navigator.clipboard.writeText(`${origin}/cadastro-lider`);
+                        sucesso('Link de Cadastro de Líder copiado!');
+                      }}
+                      className="p-1.5 rounded-lg text-xs font-bold bg-[#0A0A0A] text-[var(--accent,#FACC15)] hover:bg-[#27272A] transition-colors"
+                      title="Copiar link"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl bg-white border border-[#E4E4E7] shadow-xs flex items-center justify-between">
+                  <div className="space-y-0.5 text-left">
+                    <p className="text-xs font-extrabold text-[#0A0A0A]">Status da Nuvem</p>
+                    <p className="text-[11px] text-[#16A34A] font-semibold flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      Supabase & Vercel Ativos
+                    </p>
+                  </div>
+                  <span className="text-[11px] font-mono px-2 py-1 rounded bg-[#F4F4F5] text-[#52525B]">
+                    v2.4 Online
+                  </span>
+                </div>
               </div>
+
+              {/* SE LÍDER DE CÉLULA: Dashboard Focado em Células & Vida Comunitária (Sem Inscrições / Sem Pagamentos) */}
+              {usuarioRole === 'lider' ? (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between text-left">
+                    <div>
+                      <h3 className="text-base font-extrabold text-[#0A0A0A]">
+                        Métricas da Liderança de Célula
+                      </h3>
+                      <p className="text-xs text-[#71717A]">
+                        Acompanhe os discípulos da sua célula, batismos e pessoas do seu bairro.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <MetricCard
+                      titulo="Células na Rede"
+                      valor={celulas.length}
+                      subtexto="Grupos em multiplicação"
+                      icone={Home}
+                    />
+                    <MetricCard
+                      titulo="Total de Integrantes"
+                      valor={totalMembrosCelulas}
+                      subtexto="Discípulos acompanhados"
+                      icone={Users}
+                      destaque
+                    />
+                    <MetricCard
+                      titulo="Batizados nas Águas"
+                      valor={`${totalBatizadosCelulas} (${percentualBatizados}%)`}
+                      subtexto="Almas firmadas na fé"
+                      icone={Droplets}
+                    />
+                    <MetricCard
+                      titulo="Novos na Conexão"
+                      valor={visitantes.length}
+                      subtexto="Aguardando integração"
+                      icone={HeartHandshake}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div
+                      onClick={() => setAbaAtiva('celulas')}
+                      className="p-5 rounded-[var(--radius-box,0.75rem)] bg-white border border-[#E4E4E7] shadow-sm cursor-pointer hover:border-black transition-colors flex items-center justify-between text-left"
+                    >
+                      <div className="space-y-1">
+                        <span className="text-xs font-bold text-[#71717A] uppercase">
+                          Gerenciamento da Célula
+                        </span>
+                        <p className="text-lg font-black text-[#0A0A0A]">
+                          Ver Integrantes & Telefones
+                        </p>
+                        <p className="text-xs text-[#52525B] flex items-center">
+                          <span>Editar membros, cargos e batismo</span>
+                          <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                        </p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-[#DCFCE7] text-[#166534]">
+                        <Home className="w-6 h-6" />
+                      </div>
+                    </div>
+
+                    <div
+                      onClick={() => setAbaAtiva('conexao')}
+                      className="p-5 rounded-[var(--radius-box,0.75rem)] bg-white border border-[#E4E4E7] shadow-sm cursor-pointer hover:border-black transition-colors flex items-center justify-between text-left"
+                    >
+                      <div className="space-y-1">
+                        <span className="text-xs font-bold text-[#71717A] uppercase">
+                          Pessoas do Meu Bairro
+                        </span>
+                        <p className="text-lg font-black text-[#0A0A0A]">
+                          Acolhimento da Conexão
+                        </p>
+                        <p className="text-xs text-[#52525B] flex items-center">
+                          <span>Convidar visitantes para sua célula</span>
+                          <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                        </p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-[#E0F2FE] text-[#075985]">
+                        <HeartHandshake className="w-6 h-6" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* SE PASTOR OU ADMINISTRADOR: Dashboard Completo com Filtro Temporal Mês a Mês e Ano */
+                <div className="space-y-8">
+                  {/* Seletor Temporal de Frequência & Membresia */}
+                  <div className="p-5 rounded-[var(--radius-box,0.75rem)] bg-white border border-[#E4E4E7] shadow-sm space-y-4 text-left">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[#F4F4F5] pb-3">
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <TrendingUp className="w-4 h-4 text-[var(--accent-hover,#CA8A04)]" />
+                          <h3 className="font-extrabold text-base text-[#0A0A0A]">
+                            Raio-X de Frequência, Almas e Membresia
+                          </h3>
+                        </div>
+                        <p className="text-xs text-[#71717A]">
+                          Monitore quantas pessoas temos na igreja, células e visitantes acolhidos no período.
+                        </p>
+                      </div>
+
+                      {/* Filtros Temporais */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {[
+                          { id: 'hoje', label: 'Hoje' },
+                          { id: 'mes_atual', label: 'Este Mês' },
+                          { id: 'mes_passado', label: 'Mês Passado' },
+                          { id: 'ano', label: 'Este Ano' },
+                          { id: 'todos', label: 'Total Histórico' },
+                        ].map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => setFiltroPeriodo(p.id as any)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              filtroPeriodo === p.id
+                                ? 'bg-black text-[var(--accent,#FACC15)] border border-black shadow-xs'
+                                : 'bg-[#F4F4F5] text-[#71717A] border border-[#E4E4E7] hover:border-black'
+                            }`}
+                          >
+                            {p.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 4 Cards de Pessoas & Frequência */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      <MetricCard
+                        titulo="Pessoas na Igreja"
+                        valor={totalPessoasNaIgreja}
+                        subtexto="Membros ativos + Almas acolhidas"
+                        icone={Users}
+                        destaque
+                      />
+                      <MetricCard
+                        titulo="Pessoas nas Células"
+                        valor={totalMembrosCelulas}
+                        subtexto={`Em ${celulas.length} células ativas`}
+                        icone={Home}
+                      />
+                      <MetricCard
+                        titulo="Visitantes no Período"
+                        valor={visitantesNoPeriodo.length}
+                        subtexto={`Filtro: ${
+                          filtroPeriodo === 'hoje'
+                            ? 'Hoje'
+                            : filtroPeriodo === 'mes_atual'
+                            ? 'Mês atual'
+                            : filtroPeriodo === 'mes_passado'
+                            ? 'Mês passado'
+                            : filtroPeriodo === 'ano'
+                            ? 'Ano atual'
+                            : 'Todo histórico'
+                        }`}
+                        icone={HeartHandshake}
+                      />
+                      <MetricCard
+                        titulo="Batismo & Discipulado"
+                        valor={`${totalBatizadosCelulas} (${percentualBatizados}%)`}
+                        subtexto="Membros batizados nas águas"
+                        icone={Droplets}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Bloco de Eventos, Inscrições e Arrecadação */}
+                  <div className="space-y-4 text-left">
+                    <h3 className="font-extrabold text-base text-[#0A0A0A]">
+                      Eventos Oficiais & Arrecadação
+                    </h3>
+
+                    <div ref={cardsRef} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      <MetricCard
+                        titulo="Total de Inscritos"
+                        valor={metricas.total}
+                        subtexto="Em todos os eventos"
+                        icone={Users}
+                      />
+                      <MetricCard
+                        titulo="Confirmados"
+                        valor={metricas.confirmados}
+                        subtexto={`${
+                          metricas.total > 0
+                            ? Math.round((metricas.confirmados / metricas.total) * 100)
+                            : 0
+                        }% de conversão`}
+                        icone={CheckCircle2}
+                      />
+                      <MetricCard
+                        titulo="Pagamentos Pendentes"
+                        valor={metricas.pendentes}
+                        subtexto="Aguardando confirmação"
+                        icone={Clock}
+                      />
+                      <MetricCard
+                        titulo="Receita Confirmada"
+                        valor={formatarMoeda(metricas.receita)}
+                        subtexto="Pix, cartão e balcão"
+                        icone={DollarSign}
+                        destaque
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Métricas dos Módulos Conexão e Células */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -688,6 +1081,155 @@ export default function AdminPage() {
         }}
         onConfirmar={handleConfirmarBaixa}
       />
+
+      {/* MODAL DE ATUALIZAÇÕES DO SISTEMA & GUIA PRÁTICO */}
+      {modalAtualizacoesAberto && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="w-full max-w-3xl bg-white rounded-[var(--radius-box,0.75rem)] border border-[#E4E4E7] shadow-modal overflow-hidden max-h-[90vh] flex flex-col text-left">
+            {/* Topo do Modal */}
+            <div className="p-6 border-b border-[#E4E4E7] flex items-center justify-between bg-[#FAFAFA]">
+              <div className="space-y-1">
+                <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-black text-[var(--accent,#FACC15)]">
+                  <Sparkles className="w-3 h-3" />
+                  <span>VERSÃO OFICIAL 2.4 — EIRA CHURCH</span>
+                </div>
+                <h3 className="text-xl font-extrabold text-[#0A0A0A]">
+                  Central de Atualizações & Guia Prático
+                </h3>
+                <p className="text-xs text-[#71717A]">
+                  Veja o que foi implementado, como usar no dia a dia da igreja e envie sugestões de melhoria.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setModalAtualizacoesAberto(false)}
+                className="text-[#71717A] hover:text-black font-bold text-xl px-2 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Conteúdo com Scroll */}
+            <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+              {/* Bloco 1: O que foi feito até agora */}
+              <div className="space-y-3">
+                <h4 className="font-extrabold text-sm text-[#0A0A0A] flex items-center gap-1.5">
+                  <span className="p-1 rounded bg-[#FEF08A] text-[#854D0E]">🚀</span>
+                  <span>O que foi feito e adicionado até agora:</span>
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3.5 rounded-xl bg-[#FAFAFA] border border-[#E4E4E7] space-y-1">
+                    <p className="font-bold text-[#0A0A0A]">👨‍👩‍👧 Segmentação por Gênero & Redes</p>
+                    <p className="text-[#52525B] leading-relaxed">
+                      Cadastro com identificação de <strong>Homem, Mulher ou Casal</strong>, conectado às redes de Homens, Mulheres, Jovens (One Way), Teens (Hype) e Casais.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-[#FAFAFA] border border-[#E4E4E7] space-y-1">
+                    <p className="font-bold text-[#0A0A0A]">🗺️ Google Maps & Proximidade de Bairro</p>
+                    <p className="text-[#52525B] leading-relaxed">
+                      Geração de rota direta no Google Maps e detecção em tempo real da célula mais próxima quando o visitante digita o bairro.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-[#FAFAFA] border border-[#E4E4E7] space-y-1">
+                    <p className="font-bold text-[#0A0A0A]">✏️ Edição de Integrantes de Célula</p>
+                    <p className="text-[#52525B] leading-relaxed">
+                      Agora é possível editar telefones, cargos na célula, tempo de caminhada e status de batismo sem precisar recadastrar a pessoa.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-[#FAFAFA] border border-[#E4E4E7] space-y-1">
+                    <p className="font-bold text-[#0A0A0A]">🏛️ Origem por Culto & Encaminhamento</p>
+                    <p className="text-[#52525B] leading-relaxed">
+                      Saiba de qual culto a pessoa veio (Domingo, One Way ou Hype) e se ela já congrega em uma célula ou deseja ser encaminhada.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-[#FAFAFA] border border-[#E4E4E7] space-y-1">
+                    <p className="font-bold text-[#0A0A0A]">📊 Raio-X com Filtros Mês a Mês</p>
+                    <p className="text-[#52525B] leading-relaxed">
+                      Filtre no dashboard o crescimento de Hoje, Este Mês, Mês Passado ou Ano para acompanhar a membresia e novos visitantes.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-[#FAFAFA] border border-[#E4E4E7] space-y-1">
+                    <p className="font-bold text-[#0A0A0A]">🖼️ Upload Direto de Favicon e Banners</p>
+                    <p className="text-[#52525B] leading-relaxed">
+                      Upload local de imagens para Favicon da aba, banner do evento (16:9) e logo sem depender de links externos.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bloco 2: Como usar de forma prática */}
+              <div className="space-y-3 pt-3 border-t border-[#F4F4F5]">
+                <h4 className="font-extrabold text-sm text-[#0A0A0A] flex items-center gap-1.5">
+                  <span className="p-1 rounded bg-[#E0F2FE] text-[#075985]">💡</span>
+                  <span>Como usar de forma prática no dia a dia ministerial:</span>
+                </h4>
+
+                <div className="space-y-2">
+                  <div className="p-3 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] space-y-0.5">
+                    <strong className="text-[#0A0A0A]">1. No Domingo / Recepção:</strong>
+                    <p className="text-[#64748B]">
+                      Abra o link <code className="bg-[#E2E8F0] px-1 py-0.5 rounded text-black font-bold">/boas-vindas</code> em tablets ou celulares da equipe de acolhimento. As informações caem instantaneamente no painel pastoral.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] space-y-0.5">
+                    <strong className="text-[#0A0A0A]">2. Para Líderes de Célula:</strong>
+                    <p className="text-[#64748B]">
+                      Acesse a aba <strong>Células</strong> para atualizar os membros e use a aba <strong>Conexão</strong> para ver novas pessoas que moram no mesmo bairro da sua reunião.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-[#F8FAFC] border border-[#E2E8F0] space-y-0.5">
+                    <strong className="text-[#0A0A0A]">3. Para Pastores e Administração:</strong>
+                    <p className="text-[#64748B]">
+                      Acompanhe as métricas de saúde no Dashboard principal e use o filtro <code className="bg-[#E2E8F0] px-1 py-0.5 rounded text-black font-bold">Este Mês</code> ou <code className="bg-[#E2E8F0] px-1 py-0.5 rounded text-black font-bold">Mês Passado</code> para planejar batismos e cultos de celebração.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bloco 3: Canal de Sugestões e Melhorias */}
+              <div className="p-4 rounded-xl bg-[#FEF08A]/30 border border-[#FDE047] space-y-2">
+                <div className="flex items-center space-x-2 text-[#854D0E] font-bold text-xs">
+                  <Send className="w-4 h-4 text-[#854D0E]" />
+                  <span>O que podemos melhorar no sistema?</span>
+                </div>
+                <p className="text-[#713F12]">
+                  Tem alguma ideia de funcionalidade, relatório ou melhoria que ajudaria a Eira Church? Fale diretamente com o desenvolvimento para incluirmos nas próximas releases.
+                </p>
+                <div className="pt-1">
+                  <a
+                    href="https://wa.me/5545999999999?text=Ol%C3%A1!%20Gostaria%20de%20sugerir%20uma%20melhoria%20para%20a%20plataforma%20da%20Eira%20Church:"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-lg bg-[#0A0A0A] text-[var(--accent,#FACC15)] font-bold text-xs hover:bg-[#27272A] transition-colors"
+                  >
+                    <span>💬 Enviar Sugestão de Melhoria</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* Rodapé do Modal */}
+            <div className="p-4 border-t border-[#E4E4E7] bg-[#FAFAFA] flex items-center justify-end">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setModalAtualizacoesAberto(false)}
+              >
+                Entendi, fechar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

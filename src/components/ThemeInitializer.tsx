@@ -5,7 +5,7 @@ import { useEffect } from 'react';
 import { useAdminStore } from '../store/adminStore';
 
 export function ThemeInitializer() {
-  const { temaAtivo, bordaAtiva, fonteAtiva, modoCor } = useAdminStore();
+  const { temaAtivo, bordaAtiva, fonteAtiva, modoCor, igrejaConfig } = useAdminStore();
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -34,6 +34,20 @@ export function ThemeInitializer() {
       document.documentElement.setAttribute('data-mode', 'light');
     }
   }, [temaAtivo, bordaAtiva, fonteAtiva, modoCor]);
+
+  // Atualização dinâmica do Favicon da Igreja
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (igrejaConfig?.faviconUrl) {
+      let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.head.appendChild(link);
+      }
+      link.href = igrejaConfig.faviconUrl;
+    }
+  }, [igrejaConfig?.faviconUrl]);
 
   return null;
 }

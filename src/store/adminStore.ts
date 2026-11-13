@@ -55,6 +55,7 @@ const IGREJA_CONFIG_PADRAO: IgrejaConfig = {
   slogan: 'Uma igreja viva, acolhedora e relevante em células',
   logoUrl: '',
   bannerUrl: '',
+  faviconUrl: '',
   endereco: {
     logradouro: '',
     bairro: '',
@@ -129,6 +130,11 @@ interface AdminStore {
   atualizarCelula: (id: string, celula: Partial<Celula>) => void;
   removerCelula: (id: string) => void;
   adicionarMembroCelula: (celulaId: string, membro: Omit<CelulaMembro, 'id'>) => void;
+  editarMembroCelula: (
+    celulaId: string,
+    membroId: string,
+    dados: Partial<CelulaMembro>
+  ) => void;
   removerMembroCelula: (celulaId: string, membroId: string) => void;
   toggleBatismoMembro: (celulaId: string, membroId: string) => void;
 }
@@ -393,6 +399,25 @@ export const useAdminStore = create<AdminStore>((set) => ({
         return {
           ...c,
           membros: [...c.membros, membroCriado],
+        };
+      });
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('eira_celulas', JSON.stringify(novaLista));
+        } catch {}
+      }
+      return { celulas: novaLista };
+    }),
+
+  editarMembroCelula: (celulaId, membroId, dados) =>
+    set((state) => {
+      const novaLista = state.celulas.map((c) => {
+        if (c.id !== celulaId) return c;
+        return {
+          ...c,
+          membros: c.membros.map((m) =>
+            m.id === membroId ? { ...m, ...dados } : m
+          ),
         };
       });
       if (typeof window !== 'undefined') {
