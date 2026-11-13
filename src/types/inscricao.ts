@@ -16,6 +16,8 @@ export interface Inscricao {
   is_menor?: boolean;
   nome_responsavel?: string | null;
   telefone_responsavel?: string | null;
+  email_responsavel?: string | null;
+  rede_participante?: string | null;
   igreja?: string | null;
   transporte?: boolean;
   observacoes_saude?: string | null;

@@ -22,6 +22,7 @@ import {
   Clock,
   Banknote,
   Sparkles,
+  ShieldAlert,
 } from 'lucide-react';
 import { useAdminStore } from '../../store/adminStore';
 import { salvarInscricaoSupabase } from '../../lib/eventoAdapter';
@@ -56,12 +57,24 @@ export const InscricaoForm: React.FC<InscricaoFormProps> = ({
   const [etapaAtual, setEtapaAtual] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  // Form State alinhado para eventos & adolescentes
+  // Determina rede inicial sugerida pelo evento
+  const redePadraoEvento = (() => {
+    if (evento.rede === 'Hype') return 'Hype';
+    if (evento.rede === 'One Way') return 'One Way';
+    if (evento.rede && ['Kids', 'Crianças'].includes(evento.rede)) return 'Kids';
+    return 'Geral';
+  })();
+
+  // Form State inteligente para adolescentes, jovens e famílias
   const [formData, setFormData] = useState({
     nome: '',
+    data_nascimento: '',
     idade: '',
+    rede_participante: redePadraoEvento,
     telefone: '',
+    nome_responsavel: '',
     telefone_responsavel: '',
+    email_responsavel: '',
     endereco: '',
     participa_celula: 'nao' as 'sim' | 'nao',
     nome_celula_lider: '',
@@ -77,6 +90,65 @@ export const InscricaoForm: React.FC<InscricaoFormProps> = ({
   );
   const [codigoComprovante, setCodigoComprovante] = useState('');
   const [comprovanteUrl, setComprovanteUrl] = useState<string | null>(null);
+
+  // Calcula a idade automaticamente com base na Data de Nascimento
+  const handleDataNascimentoChange = (dataStr: string) => {
+    let novaIdade = formData.idade;
+    if (dataStr) {
+      const parts = dataStr.split('-');
+      if (parts.length === 3) {
+        const anoNasc = parseInt(parts[0], 10);
+        const mesNasc = parseInt(parts[1], 10) - 1;
+        const diaNasc = parseInt(parts[2], 10);
+        const hoje = new Date();
+        let calcIdade = hoje.getFullYear() - anoNasc;
+        const m = hoje.getMonth() - mesNasc;
+        if (m < 0 || (m === 0 && hoje.getDate() < diaNasc)) {
+          calcIdade--;
+        }
+        if (calcIdade >= 0 && calcIdade < 125) {
+          novaIdade = String(calcIdade);
+        }
+      }
+    }
+    setFormData((prev) => ({
+      ...prev,
+      data_nascimento: dataStr,
+      idade: novaIdade,
+    }));
+  };
+
+  // Regra inteligente solicitada pelo usuário:
+  // - Se for rede de jovens universitários (One Way) e/ou maior de 18 anos: NÃO coloca opção de responsável.
+  // - Se for adolescente, HYPE, criança ou menor de 18 anos: coloca WhatsApp e e-mail do responsável.
+  const idadeNum = parseInt(formData.idade, 10);
+  const isMenorDeIdade = !isNaN(idadeNum) && idadeNum < 18;
+  const isRedeTeenOuKids =
+    formData.rede_participante === 'Hype' ||
+    formData.rede_participante === 'Kids' ||
+    evento.rede === 'Hype';
+  const isRedeJovensUniversitarios =
+    formData.rede_participante === 'One Way' || evento.rede === 'One Way';
+
+  const exigeResponsavel = React.useMemo(() => {
+    // Se a idade for 18 anos ou mais, é jovem/adulto independente: não exige responsável
+    if (!isNaN(idadeNum) && idadeNum >= 18) {
+      return false;
+    }
+    // Se a idade for menor que 18 anos:
+    if (isMenorDeIdade) {
+      return true;
+    }
+    // Se for da rede Hype ou Kids:
+    if (isRedeTeenOuKids) {
+      return true;
+    }
+    // Se for da rede One Way (jovens universitários) e não é menor explícito:
+    if (isRedeJovensUniversitarios) {
+      return false;
+    }
+    return false;
+  }, [idadeNum, isMenorDeIdade, isRedeTeenOuKids, isRedeJovensUniversitarios]);
 
   const handleUploadComprovante = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -103,16 +175,21 @@ export const InscricaoForm: React.FC<InscricaoFormProps> = ({
     }
 
     if (!formData.idade.trim()) {
-      novosErros.idade = 'Informe sua idade.';
+      novosErros.idade = 'Informe sua idade ou data de nascimento.';
     }
 
     if (!formData.telefone.trim()) {
       novosErros.telefone = 'Informe seu telefone / WhatsApp com DDD.';
     }
 
-    const idadeNum = parseInt(formData.idade, 10);
-    if ((isNaN(idadeNum) || idadeNum < 18) && !formData.telefone_responsavel.trim()) {
-      novosErros.telefone_responsavel = 'Informe o telefone/WhatsApp de um responsável.';
+    // Validação de responsável apenas quando for menor ou rede adolescente/kids
+    if (exigeResponsavel) {
+      if (!formData.telefone_responsavel.trim()) {
+        novosErros.telefone_responsavel = 'Informe o WhatsApp/telefone de um responsável.';
+      }
+      if (!formData.email_responsavel.trim()) {
+        novosErros.email_responsavel = 'Informe o e-mail do responsável para envio das autorizações.';
+      }
     }
 
     setErros(novosErros);
@@ -138,8 +215,12 @@ export const InscricaoForm: React.FC<InscricaoFormProps> = ({
         nome: formData.nome,
         telefone: formData.telefone,
         email: formData.email,
+        nascimento: formData.data_nascimento || null,
         idade: formData.idade,
-        telefone_responsavel: formData.telefone_responsavel,
+        nome_responsavel: exigeResponsavel ? formData.nome_responsavel : null,
+        telefone_responsavel: exigeResponsavel ? formData.telefone_responsavel : null,
+        email_responsavel: exigeResponsavel ? formData.email_responsavel : null,
+        rede_participante: formData.rede_participante,
         endereco: formData.endereco,
         participa_celula: formData.participa_celula === 'sim',
         nome_celula_lider: formData.nome_celula_lider,
@@ -167,8 +248,12 @@ export const InscricaoForm: React.FC<InscricaoFormProps> = ({
       nome: formData.nome,
       telefone: formData.telefone,
       email: formData.email,
+      nascimento: formData.data_nascimento || null,
       idade: formData.idade,
-      telefone_responsavel: formData.telefone_responsavel,
+      nome_responsavel: exigeResponsavel ? formData.nome_responsavel : null,
+      telefone_responsavel: exigeResponsavel ? formData.telefone_responsavel : null,
+      email_responsavel: exigeResponsavel ? formData.email_responsavel : null,
+      rede_participante: formData.rede_participante,
       endereco: formData.endereco,
       participa_celula: formData.participa_celula === 'sim',
       nome_celula_lider: formData.nome_celula_lider,
@@ -233,8 +318,73 @@ export const InscricaoForm: React.FC<InscricaoFormProps> = ({
             autoComplete="name"
           />
 
-          {/* 2. Idade & Telefone */}
+          {/* 2. Seleção de Rede / Faixa Etária */}
+          <div className="space-y-1.5 text-left">
+            <label className="block text-xs font-bold uppercase tracking-tight text-[#0A0A0A]">
+              Sua Rede / Faixa Etária
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, rede_participante: 'Hype' })}
+                className={`py-2 px-3 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                  formData.rede_participante === 'Hype'
+                    ? 'border-black bg-black text-[var(--accent,#FACC15)] shadow-xs'
+                    : 'border-[#E4E4E7] bg-white text-[#71717A] hover:bg-[#F4F4F5]'
+                }`}
+              >
+                ⚡ HYPE (Teens)
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, rede_participante: 'One Way' })}
+                className={`py-2 px-3 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                  formData.rede_participante === 'One Way'
+                    ? 'border-black bg-black text-[var(--accent,#FACC15)] shadow-xs'
+                    : 'border-[#E4E4E7] bg-white text-[#71717A] hover:bg-[#F4F4F5]'
+                }`}
+              >
+                🚀 One Way (Jovens)
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, rede_participante: 'Kids' })}
+                className={`py-2 px-3 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                  formData.rede_participante === 'Kids'
+                    ? 'border-black bg-black text-[var(--accent,#FACC15)] shadow-xs'
+                    : 'border-[#E4E4E7] bg-white text-[#71717A] hover:bg-[#F4F4F5]'
+                }`}
+              >
+                🎈 Kids (Crianças)
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, rede_participante: 'Adultos' })}
+                className={`py-2 px-3 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                  formData.rede_participante === 'Adultos' || formData.rede_participante === 'Geral'
+                    ? 'border-black bg-black text-[var(--accent,#FACC15)] shadow-xs'
+                    : 'border-[#E4E4E7] bg-white text-[#71717A] hover:bg-[#F4F4F5]'
+                }`}
+              >
+                👥 Adultos / Família
+              </button>
+            </div>
+          </div>
+
+          {/* 3. Data de Nascimento & Idade */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Data de Nascimento"
+              type="date"
+              value={formData.data_nascimento}
+              onChange={(e) => handleDataNascimentoChange(e.target.value)}
+              helperText={
+                formData.idade
+                  ? `${formData.idade} anos ${isMenorDeIdade ? '(Menor de 18 anos)' : '(Maior de idade)'}`
+                  : 'Calcula a idade automaticamente'
+              }
+            />
+
             <Input
               label="Idade"
               required
@@ -245,44 +395,113 @@ export const InscricaoForm: React.FC<InscricaoFormProps> = ({
               onChange={(e) => setFormData({ ...formData, idade: e.target.value })}
               error={erros.idade}
               placeholder="Ex: 15"
+              helperText={
+                isMenorDeIdade
+                  ? '🛡️ Adolescente / Criança (Requer responsável)'
+                  : '🎓 Jovem / Adulto (Inscrição direta)'
+              }
             />
+          </div>
 
+          {/* 4. WhatsApp & E-mail do Participante */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="WhatsApp / Telefone com DDD"
               required
               type="tel"
               inputMode="tel"
               value={formData.telefone}
-              onChange={(e) => setFormData({ ...formData, telefone: formatarTelefone(e.target.value) })}
+              onChange={(e) =>
+                setFormData({ ...formData, telefone: formatarTelefone(e.target.value) })
+              }
               error={erros.telefone}
               placeholder="(00) 00000-0000"
               autoComplete="tel"
             />
-          </div>
-
-          {/* 3. Telefone de um Responsável & Endereço */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
-              label="WhatsApp / Telefone de um Responsável"
-              required
-              type="tel"
-              inputMode="tel"
-              value={formData.telefone_responsavel}
-              onChange={(e) =>
-                setFormData({ ...formData, telefone_responsavel: formatarTelefone(e.target.value) })
-              }
-              error={erros.telefone_responsavel}
-              placeholder="(00) 00000-0000"
-              helperText="Mãe, pai ou responsável legal"
-            />
 
             <Input
-              label="Endereço (Bairro / Cidade)"
-              value={formData.endereco}
-              onChange={(e) => setFormData({ ...formData, endereco: e.target.value })}
-              placeholder="Ex: Rua das Flores, Bairro Aventureiro"
+              label="E-mail do Participante"
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              placeholder="seuemail@exemplo.com"
             />
           </div>
+
+          {/* 5. SEÇÃO DE CONTATOS DO RESPONSÁVEL (Apenas para Adolescentes/Crianças/Hype ou < 18 anos) */}
+          {exigeResponsavel ? (
+            <div className="p-4 rounded-xl bg-[#EFF6FF] border border-[#BFDBFE] space-y-3 text-left">
+              <div className="flex items-center space-x-2">
+                <ShieldAlert className="w-4 h-4 text-[#2563EB]" />
+                <h4 className="text-xs font-bold uppercase tracking-tight text-[#1E40AF]">
+                  Contatos do Responsável (Obrigatório para Adolescentes / Crianças / HYPE)
+                </h4>
+              </div>
+              <p className="text-[11px] text-[#3B82F6]">
+                Informe o WhatsApp e e-mail dos pais ou responsável para confirmação e autorização do evento.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <Input
+                  label="WhatsApp / Telefone do Responsável"
+                  required
+                  type="tel"
+                  inputMode="tel"
+                  value={formData.telefone_responsavel}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      telefone_responsavel: formatarTelefone(e.target.value),
+                    })
+                  }
+                  error={erros.telefone_responsavel}
+                  placeholder="(00) 00000-0000"
+                  helperText="Pai, mãe ou responsável legal"
+                />
+
+                <Input
+                  label="E-mail do Responsável"
+                  required
+                  type="email"
+                  value={formData.email_responsavel}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email_responsavel: e.target.value })
+                  }
+                  error={erros.email_responsavel}
+                  placeholder="emaildospais@exemplo.com"
+                  helperText="Para envio de autorizações e informes"
+                />
+              </div>
+
+              <div>
+                <Input
+                  label="Nome do Responsável (Opcional)"
+                  value={formData.nome_responsavel}
+                  onChange={(e) =>
+                    setFormData({ ...formData, nome_responsavel: e.target.value })
+                  }
+                  placeholder="Ex: Carlos Oliveira (Pai)"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="p-3 rounded-xl bg-[#FAFAFA] border border-[#E4E4E7] text-left flex items-center space-x-2 text-xs text-[#52525B]">
+              <span className="p-1 rounded bg-[#E4E4E7] text-[#0A0A0A] font-bold text-[10px]">
+                {formData.rede_participante === 'One Way' ? 'ONE WAY' : '18+'}
+              </span>
+              <span>
+                <strong>Rede de Jovens / Universitários:</strong> Inscrição individual sem necessidade de dados de responsável.
+              </span>
+            </div>
+          )}
+
+          {/* 6. Endereço */}
+          <Input
+            label="Endereço (Bairro / Cidade)"
+            value={formData.endereco}
+            onChange={(e) => setFormData({ ...formData, endereco: e.target.value })}
+            placeholder="Ex: Rua das Flores, Bairro Aventureiro"
+          />
 
           {/* 4. Participa de alguma célula? */}
           <div className="p-4 rounded-xl bg-[#FAFAFA] border border-[#E4E4E7] space-y-3 text-left">
@@ -710,8 +929,28 @@ export const InscricaoForm: React.FC<InscricaoFormProps> = ({
                 </p>
               )}
               {formData.telefone_responsavel ? (
-                <p><strong>Responsável:</strong> {formData.telefone_responsavel}</p>
-              ) : null}
+                <div className="pt-1.5 border-t border-[#E4E4E7] space-y-0.5 text-[#1E40AF]">
+                  <p>
+                    <strong>WhatsApp Responsável:</strong> {formData.telefone_responsavel}
+                  </p>
+                  {formData.email_responsavel && (
+                    <p>
+                      <strong>E-mail Responsável:</strong> {formData.email_responsavel}
+                    </p>
+                  )}
+                  {formData.nome_responsavel && (
+                    <p>
+                      <strong>Nome Responsável:</strong> {formData.nome_responsavel}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="pt-1 text-[#52525B]">
+                  <p>
+                    <strong>Perfil:</strong> Rede {formData.rede_participante || 'Jovens'} (Inscrição individual 18+)
+                  </p>
+                </div>
+              )}
               {comprovanteUrl && (
                 <p className="text-[#166534] font-bold flex items-center pt-1 border-t border-[#E4E4E7]">
                   <Check className="w-3.5 h-3.5 mr-1" />

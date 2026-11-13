@@ -7,7 +7,17 @@ import { Inscricao, MetodoPagamento } from '../../types/inscricao';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { formatarMoeda } from '../../lib/formatters';
-import { CheckCircle2, Banknote, QrCode, CreditCard, Gift, ExternalLink, Paperclip } from 'lucide-react';
+import {
+  CheckCircle2,
+  Banknote,
+  QrCode,
+  CreditCard,
+  Gift,
+  ExternalLink,
+  Paperclip,
+  ShieldAlert,
+  MessageCircle,
+} from 'lucide-react';
 
 export interface BaixaManualModalProps {
   inscricao: Inscricao | null;
@@ -55,6 +65,37 @@ export const BaixaManualModal: React.FC<BaixaManualModalProps> = ({
             {formatarMoeda(inscricao.evento?.valor || 0)}
           </p>
         </div>
+
+        {/* Contato do Responsável (quando adolescente / informado) */}
+        {inscricao.telefone_responsavel && (
+          <div className="p-3.5 rounded-xl bg-[#EFF6FF] border border-[#BFDBFE] space-y-2 text-xs text-[#1E40AF]">
+            <div className="flex items-center justify-between">
+              <span className="font-extrabold flex items-center gap-1.5 text-[#1E40AF]">
+                <ShieldAlert className="w-4 h-4 text-[#2563EB]" />
+                Contato do Responsável (Menor / HYPE)
+              </span>
+              <a
+                href={`https://wa.me/55${inscricao.telefone_responsavel.replace(/\D/g, '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-2 py-0.5 rounded bg-[#DCFCE7] border border-[#86EFAC] text-[#166534] font-bold text-[11px] hover:underline inline-flex items-center gap-1"
+                title="Chamar responsável no WhatsApp"
+              >
+                <MessageCircle className="w-3 h-3 text-[#22C55E]" />
+                WhatsApp do Pai/Mãe
+              </a>
+            </div>
+            <div className="space-y-0.5 text-[11px]">
+              <p><strong>WhatsApp:</strong> {inscricao.telefone_responsavel}</p>
+              {inscricao.email_responsavel && (
+                <p><strong>E-mail:</strong> {inscricao.email_responsavel}</p>
+              )}
+              {inscricao.nome_responsavel && (
+                <p><strong>Nome:</strong> {inscricao.nome_responsavel}</p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Comprovante Anexado pelo Participante */}
         {inscricao.comprovante_url && (

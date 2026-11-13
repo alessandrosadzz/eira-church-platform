@@ -101,6 +101,10 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
       origem: string;
       detalhes: string;
       badgeCor: string;
+      telefoneResponsavel?: string | null;
+      emailResponsavel?: string | null;
+      nomeResponsavel?: string | null;
+      idade?: number | null;
     }[] = [];
 
     const nomesLideresVistos = new Set<string>();
@@ -182,13 +186,18 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
 
     // 4. Inscritos em Eventos
     inscricoes.forEach((insc) => {
+      const isMenor = (insc.idade && insc.idade < 18) || (insc.rede_participante === 'Hype');
       lista.push({
         id: `insc-${insc.id}`,
         nome: insc.nome,
         telefone: insc.telefone || null,
         email: insc.email || null,
         categoria: 'inscrito',
-        categoriaLabel: 'Inscrito em Evento',
+        categoriaLabel: isMenor
+          ? `Teens / HYPE (${insc.idade ? `${insc.idade}a` : 'Menor'})`
+          : insc.rede_participante === 'One Way'
+          ? 'Jovens (One Way)'
+          : 'Inscrito em Evento',
         origem: insc.evento?.nome || 'Evento Eira Church',
         detalhes: `Código: ${insc.comprovante_hash || 'EIRA'} • ${
           insc.status === 'pago'
@@ -197,7 +206,13 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
             ? 'Isento'
             : 'Pré-Inscrição (Pendente)'
         }`,
-        badgeCor: 'bg-purple-100 text-purple-900 border-purple-300',
+        telefoneResponsavel: insc.telefone_responsavel || null,
+        emailResponsavel: insc.email_responsavel || null,
+        nomeResponsavel: insc.nome_responsavel || null,
+        idade: insc.idade || null,
+        badgeCor: isMenor
+          ? 'bg-amber-100 text-amber-900 border-amber-300'
+          : 'bg-purple-100 text-purple-900 border-purple-300',
       });
     });
 
@@ -704,6 +719,13 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
                       ? `https://wa.me/55${numeroLimpo}`
                       : null;
 
+                    const telRespLimpo = p.telefoneResponsavel
+                      ? p.telefoneResponsavel.replace(/\D/g, '')
+                      : '';
+                    const linkWhatsAppResp = telRespLimpo
+                      ? `https://wa.me/55${telRespLimpo}`
+                      : null;
+
                     return (
                       <div
                         key={p.id}
@@ -727,6 +749,31 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
                             <p className="text-[11px] text-[#71717A] truncate mt-0.5">
                               {p.origem} • <span className="text-[#52525B]">{p.detalhes}</span>
                             </p>
+                            {p.telefoneResponsavel && (
+                              <div className="flex flex-wrap items-center gap-1.5 mt-1.5 text-[11px] text-[#1E40AF]">
+                                <span className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded font-medium">
+                                  <ShieldAlert className="w-3 h-3 text-[#2563EB]" />
+                                  <span>Resp: {p.telefoneResponsavel}</span>
+                                </span>
+                                {p.emailResponsavel && (
+                                  <span className="text-[#3B82F6] font-mono text-[10px]">
+                                    ({p.emailResponsavel})
+                                  </span>
+                                )}
+                                {linkWhatsAppResp && (
+                                  <a
+                                    href={linkWhatsAppResp}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-[#166534] hover:underline font-bold bg-[#DCFCE7] border border-[#86EFAC] px-1.5 py-0.5 rounded"
+                                    title="Chamar pai/mãe no WhatsApp"
+                                  >
+                                    <MessageCircle className="w-3 h-3 text-[#22C55E]" />
+                                    WhatsApp do Pai/Mãe
+                                  </a>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
 

@@ -179,17 +179,21 @@ export function salvarEventosLocal(lista: Evento[]): void {
  */
 export async function buscarInscricoesSupabase(): Promise<Inscricao[]> {
   const comprovantesMap: Record<string, string> = {};
+  const detalhesMap: Record<string, any> = {};
   if (typeof window !== 'undefined') {
     try {
-      const salvos = localStorage.getItem('eira_comprovantes_map');
-      if (salvos) Object.assign(comprovantesMap, JSON.parse(salvos));
+      const salvosComp = localStorage.getItem('eira_comprovantes_map');
+      if (salvosComp) Object.assign(comprovantesMap, JSON.parse(salvosComp));
+
+      const salvosDet = localStorage.getItem('eira_inscricoes_detalhes_map');
+      if (salvosDet) Object.assign(detalhesMap, JSON.parse(salvosDet));
     } catch {}
   }
 
   try {
     const { data, error } = await supabase
       .from('inscricoes')
-      .select('*, evento:eventos(nome, preco, categoria, imagem_url)')
+      .select('*, evento:eventos(nome, preco, categoria, rede, imagem_url)')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -198,24 +202,36 @@ export async function buscarInscricoesSupabase(): Promise<Inscricao[]> {
     }
 
     if (data && data.length > 0) {
-      const mapeadas: Inscricao[] = data.map((row: any) => ({
-        id: row.id,
-        evento_id: row.evento_id,
-        nome: row.nome,
-        email: row.email || undefined,
-        telefone: row.telefone,
-        status: (row.status as StatusInscricao) || 'pendente',
-        metodo_pag: (row.metodo_pagamento as MetodoPagamento) || 'pix',
-        comprovante_hash: row.codigo_inscricao,
-        comprovante_url: comprovantesMap[row.codigo_inscricao] || comprovantesMap[row.id] || null,
-        created_at: row.data_inscricao || row.created_at,
-        evento: {
-          nome: row.evento?.nome || 'Evento Geral',
-          categoria: row.evento?.categoria || 'Outro',
-          rede: 'Padrão',
-          valor: Number(row.evento?.preco || row.valor_pago || 0),
-        },
-      }));
+      const mapeadas: Inscricao[] = data.map((row: any) => {
+        const extra = detalhesMap[row.codigo_inscricao] || detalhesMap[row.id] || {};
+        return {
+          id: row.id,
+          evento_id: row.evento_id,
+          nome: row.nome,
+          email: row.email || undefined,
+          telefone: row.telefone,
+          nascimento: extra.nascimento || row.nascimento || null,
+          idade: extra.idade ?? (row.idade ? Number(row.idade) : null),
+          nome_responsavel: extra.nome_responsavel || row.nome_responsavel || null,
+          telefone_responsavel: extra.telefone_responsavel || row.telefone_responsavel || null,
+          email_responsavel: extra.email_responsavel || row.email_responsavel || null,
+          rede_participante: extra.rede_participante || row.rede_participante || null,
+          observacoes_saude: extra.observacoes_saude || row.observacoes_saude || null,
+          participa_celula: extra.participa_celula ?? row.participa_celula,
+          nome_celula_lider: extra.nome_celula_lider || row.nome_celula_lider || null,
+          status: (row.status as StatusInscricao) || 'pendente',
+          metodo_pag: (row.metodo_pagamento as MetodoPagamento) || 'pix',
+          comprovante_hash: row.codigo_inscricao,
+          comprovante_url: comprovantesMap[row.codigo_inscricao] || comprovantesMap[row.id] || null,
+          created_at: row.data_inscricao || row.created_at,
+          evento: {
+            nome: row.evento?.nome || 'Evento Geral',
+            categoria: row.evento?.categoria || 'Outro',
+            rede: row.evento?.rede || 'Padrão',
+            valor: Number(row.evento?.preco || row.valor_pago || 0),
+          },
+        };
+      });
 
       salvarInscricoesLocal(mapeadas);
       return mapeadas;
@@ -236,8 +252,12 @@ export async function salvarInscricaoSupabase(dados: {
   nome: string;
   telefone: string;
   email?: string;
+  nascimento?: string | null;
   idade?: number | string | null;
+  nome_responsavel?: string | null;
   telefone_responsavel?: string | null;
+  email_responsavel?: string | null;
+  rede_participante?: string | null;
   endereco?: string | null;
   participa_celula?: boolean;
   nome_celula_lider?: string | null;
@@ -251,14 +271,34 @@ export async function salvarInscricaoSupabase(dados: {
 }): Promise<Inscricao> {
   const idValido = garantirUUID();
 
-  // Salva comprovante no mapa local
-  if (dados.comprovante_url && typeof window !== 'undefined') {
+  // Salva comprovante e detalhes no mapa local
+  if (typeof window !== 'undefined') {
     try {
-      const salvos = localStorage.getItem('eira_comprovantes_map');
-      const mapa = salvos ? JSON.parse(salvos) : {};
-      mapa[dados.codigo_inscricao] = dados.comprovante_url;
-      mapa[idValido] = dados.comprovante_url;
-      localStorage.setItem('eira_comprovantes_map', JSON.stringify(mapa));
+      if (dados.comprovante_url) {
+        const salvos = localStorage.getItem('eira_comprovantes_map');
+        const mapa = salvos ? JSON.parse(salvos) : {};
+        mapa[dados.codigo_inscricao] = dados.comprovante_url;
+        mapa[idValido] = dados.comprovante_url;
+        localStorage.setItem('eira_comprovantes_map', JSON.stringify(mapa));
+      }
+
+      const salvosDet = localStorage.getItem('eira_inscricoes_detalhes_map');
+      const mapaDet = salvosDet ? JSON.parse(salvosDet) : {};
+      const extra = {
+        nascimento: dados.nascimento || null,
+        idade: dados.idade ? Number(dados.idade) : null,
+        nome_responsavel: dados.nome_responsavel || null,
+        telefone_responsavel: dados.telefone_responsavel || null,
+        email_responsavel: dados.email_responsavel || null,
+        rede_participante: dados.rede_participante || null,
+        endereco: dados.endereco || null,
+        participa_celula: dados.participa_celula,
+        nome_celula_lider: dados.nome_celula_lider || null,
+        observacoes_saude: dados.observacoes_saude || null,
+      };
+      mapaDet[dados.codigo_inscricao] = extra;
+      mapaDet[idValido] = extra;
+      localStorage.setItem('eira_inscricoes_detalhes_map', JSON.stringify(mapaDet));
     } catch {}
   }
 
@@ -290,8 +330,12 @@ export async function salvarInscricaoSupabase(dados: {
     nome: dados.nome,
     email: dados.email,
     telefone: dados.telefone,
+    nascimento: dados.nascimento || null,
     idade: dados.idade ? Number(dados.idade) : null,
+    nome_responsavel: dados.nome_responsavel || null,
     telefone_responsavel: dados.telefone_responsavel || null,
+    email_responsavel: dados.email_responsavel || null,
+    rede_participante: dados.rede_participante || null,
     participa_celula: dados.participa_celula,
     nome_celula_lider: dados.nome_celula_lider || null,
     observacoes_saude: dados.observacoes_saude || null,

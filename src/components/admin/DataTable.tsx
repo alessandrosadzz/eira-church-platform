@@ -8,7 +8,16 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 import { formatarDataHora } from '../../lib/formatters';
-import { AlertTriangle, CheckCircle, RotateCcw, Lock, Paperclip, ExternalLink } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle,
+  RotateCcw,
+  Lock,
+  Paperclip,
+  ExternalLink,
+  ShieldAlert,
+  MessageCircle,
+} from 'lucide-react';
 
 export interface DataTableProps {
   inscricoes: Inscricao[];
@@ -79,10 +88,42 @@ export const DataTable: React.FC<DataTableProps> = ({
                 >
                   {/* Participante */}
                   <td className="py-3.5 px-4">
-                    <div className="font-bold text-[#0A0A0A]">{inscricao.nome}</div>
+                    <div className="font-bold text-[#0A0A0A] flex items-center gap-1.5">
+                      <span>{inscricao.nome}</span>
+                      {inscricao.idade ? (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#F4F4F5] text-[#52525B]">
+                          {inscricao.idade}a
+                        </span>
+                      ) : null}
+                    </div>
                     <div className="text-xs text-[#71717A]">
                       {inscricao.telefone || inscricao.email || 'Sem contato'}
                     </div>
+
+                    {/* WhatsApp e Email do Responsável (quando informado / menor) */}
+                    {inscricao.telefone_responsavel && (
+                      <div className="mt-1 pt-1 border-t border-[#F4F4F5] text-[11px] text-[#1E40AF] space-y-0.5">
+                        <div className="flex items-center gap-1">
+                          <ShieldAlert className="w-3 h-3 text-[#2563EB] shrink-0" />
+                          <span>Resp: {inscricao.telefone_responsavel}</span>
+                          <a
+                            href={`https://wa.me/55${inscricao.telefone_responsavel.replace(/\D/g, '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#166534] hover:underline font-bold inline-flex items-center gap-0.5 ml-1"
+                            title="Chamar responsável no WhatsApp"
+                          >
+                            <MessageCircle className="w-2.5 h-2.5 text-[#22C55E]" />
+                            WhatsApp
+                          </a>
+                        </div>
+                        {inscricao.email_responsavel && (
+                          <div className="text-[10px] text-[#3B82F6] font-mono truncate max-w-[220px]">
+                            {inscricao.email_responsavel}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </td>
 
                   {/* Evento */}
