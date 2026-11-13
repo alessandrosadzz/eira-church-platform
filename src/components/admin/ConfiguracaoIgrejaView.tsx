@@ -36,7 +36,12 @@ import {
   ChevronUp,
   MessageCircle,
 } from 'lucide-react';
-import { buscarInscricoesSupabase, carregarInscricoesLocal } from '../../lib/eventoAdapter';
+import {
+  buscarInscricoesSupabase,
+  carregarInscricoesLocal,
+  buscarCelulasSupabase,
+  buscarVisitantesSupabase,
+} from '../../lib/eventoAdapter';
 import { Inscricao } from '../../types/inscricao';
 
 export const ConfiguracaoIgrejaView: React.FC = () => {
@@ -55,7 +60,9 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
     modoCor,
     setModoCor,
     celulas,
+    setCelulas,
     visitantes,
+    setVisitantes,
     lideres,
   } = useAdminStore();
 
@@ -72,12 +79,18 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
   const carregarInscricoes = async () => {
     setCarregandoInscricoes(true);
     try {
-      const data = await buscarInscricoesSupabase();
-      if (data && data.length > 0) {
-        setInscricoes(data);
+      const [inscs, cels, viss] = await Promise.all([
+        buscarInscricoesSupabase(),
+        buscarCelulasSupabase(),
+        buscarVisitantesSupabase(),
+      ]);
+      if (inscs && inscs.length > 0) {
+        setInscricoes(inscs);
       } else {
         setInscricoes(carregarInscricoesLocal());
       }
+      if (cels && cels.length > 0) setCelulas(cels);
+      if (viss && viss.length > 0) setVisitantes(viss);
     } catch {
       setInscricoes(carregarInscricoesLocal());
     } finally {

@@ -24,6 +24,8 @@ import {
   salvarEventoSupabase,
   buscarInscricoesSupabase,
   atualizarStatusInscricaoSupabase,
+  buscarCelulasSupabase,
+  buscarVisitantesSupabase,
 } from '../../lib/eventoAdapter';
 import { useToast } from '../../hooks/useToast';
 import { Input } from '../../components/ui/Input';
@@ -68,6 +70,8 @@ export default function AdminPage() {
     igrejaConfig,
     visitantes,
     celulas,
+    setCelulas,
+    setVisitantes,
     usuarioRole,
     setUsuarioRole,
     validarLogin,
@@ -161,18 +165,35 @@ export default function AdminPage() {
 
   // Modal Central de Atualizações e Novidades da Plataforma
   const [modalAtualizacoesAberto, setModalAtualizacoesAberto] = useState(false);
+  const [carregandoDados, setCarregandoDados] = useState(false);
 
-  // Carrega Eventos e Inscrições sincronizados com o Supabase e LocalStorage
-  const carregarDadosGerais = async () => {
+  // Carrega Eventos, Inscrições, Células e Visitantes sincronizados com o Supabase
+  const carregarDadosGerais = async (mostrarFeedback = false) => {
+    setCarregandoDados(true);
     try {
-      const [evs, inscs] = await Promise.all([
+      const [evs, inscs, cels, viss] = await Promise.all([
         buscarEventosSupabase(),
         buscarInscricoesSupabase(),
+        buscarCelulasSupabase(),
+        buscarVisitantesSupabase(),
       ]);
       if (evs && evs.length > 0) setEventos(evs);
       if (inscs) setInscricoes(inscs);
+      if (cels && cels.length > 0) setCelulas(cels);
+      if (viss && viss.length > 0) setVisitantes(viss);
+
+      if (mostrarFeedback) {
+        sucesso(
+          `Sincronizado com o Supabase! (${inscs?.length || 0} inscrições, ${cels?.length || 0} células, ${viss?.length || 0} conexões)`
+        );
+      }
     } catch (e) {
       console.warn('Erro ao carregar dados:', e);
+      if (mostrarFeedback) {
+        erro('Não foi possível sincronizar com o Supabase.');
+      }
+    } finally {
+      setCarregandoDados(false);
     }
   };
 
@@ -468,7 +489,11 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] flex flex-col transition-colors">
-      <AdminHeader onLogout={handleLogout} />
+      <AdminHeader
+        onLogout={handleLogout}
+        onAtualizar={() => carregarDadosGerais(true)}
+        carregando={carregandoDados}
+      />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1 space-y-8">
         <div ref={tabContentRef}>
@@ -985,7 +1010,8 @@ export default function AdminPage() {
               <FilterBar
                 eventos={eventos}
                 onExportarCsv={() => exportarCsvInscricoes(inscricoesFiltradas)}
-                onRefresh={() => info('Dados atualizados.')}
+                onRefresh={() => carregarDadosGerais(true)}
+                isRefreshing={carregandoDados}
               />
 
               <DataTable

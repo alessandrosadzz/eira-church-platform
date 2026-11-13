@@ -25,12 +25,20 @@ import {
   Droplets,
   Share2,
   Pencil,
+  RefreshCw,
 } from 'lucide-react';
+import {
+  salvarCelulaSupabase,
+  atualizarCelulaSupabase,
+  removerCelulaSupabase,
+  buscarCelulasSupabase,
+} from '../../lib/eventoAdapter';
 
 export const CelulasView: React.FC = () => {
   const { sucesso, info } = useToast();
   const {
     celulas,
+    setCelulas,
     adicionarCelula,
     removerCelula,
     adicionarMembroCelula,
@@ -39,6 +47,8 @@ export const CelulasView: React.FC = () => {
     toggleBatismoMembro,
     usuarioRole,
   } = useAdminStore();
+
+  const [carregandoCelulas, setCarregandoCelulas] = useState(false);
 
   const [busca, setBusca] = useState('');
   const [redeFiltro, setRedeFiltro] = useState<string>('Todas');
@@ -67,7 +77,7 @@ export const CelulasView: React.FC = () => {
     setEditBatizado(m.batizado);
   };
 
-  const handleSalvarEdicaoMembro = (e: React.FormEvent) => {
+  const handleSalvarEdicaoMembro = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!membroParaEditar) return;
     if (!editNome.trim()) {
@@ -82,17 +92,23 @@ export const CelulasView: React.FC = () => {
       batizado: editBatizado,
     };
     editarMembroCelula(membroParaEditar.celulaId, membroParaEditar.membro.id, dadosAtualizados);
+    const membrosNovos = celulaSelecionada
+      ? celulaSelecionada.membros.map((x) =>
+          x.id === membroParaEditar.membro.id ? { ...x, ...dadosAtualizados } : x
+        )
+      : [];
     setCelulaSelecionada((prev) =>
       prev
         ? {
             ...prev,
-            membros: prev.membros.map((x) =>
-              x.id === membroParaEditar.membro.id ? { ...x, ...dadosAtualizados } : x
-            ),
+            membros: membrosNovos,
           }
         : null
     );
-    sucesso(`Dados de ${editNome} atualizados com sucesso!`);
+    await atualizarCelulaSupabase(membroParaEditar.celulaId, {
+      membros: membrosNovos,
+    });
+    sucesso(`Dados de ${editNome} atualizados e salvos no Supabase!`);
     setMembroParaEditar(null);
   };
 
@@ -158,8 +174,26 @@ export const CelulasView: React.FC = () => {
     }
   };
 
+  // Recarregar células do Supabase
+  const handleRecarregarCelulas = async () => {
+    setCarregandoCelulas(true);
+    try {
+      const cels = await buscarCelulasSupabase();
+      if (cels && cels.length > 0) {
+        setCelulas(cels);
+        sucesso(`Células sincronizadas com o Supabase! (${cels.length} células ativas)`);
+      } else {
+        info('Nenhuma célula encontrada no banco.');
+      }
+    } catch {
+      info('Não foi possível atualizar as células.');
+    } finally {
+      setCarregandoCelulas(false);
+    }
+  };
+
   // Salvar Nova Célula
-  const handleSalvarCelula = (e: React.FormEvent) => {
+  const handleSalvarCelula = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!novaNome.trim()) {
@@ -172,26 +206,26 @@ export const CelulasView: React.FC = () => {
     }
 
     const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(
-      `${novoEndereco || novoBairro}, Cascavel - PR`
+      `${novoEndereco || novoBairro}, Joinville - SC`
     )}`;
 
-    adicionarCelula({
+    const celulaCriada = await salvarCelulaSupabase({
       nome: novaNome.trim(),
       rede: novaRede,
       lider_nome: novoLiderNome.trim(),
-      lider_telefone: novoLiderTel.trim() || '(45) 99999-9999',
+      lider_telefone: novoLiderTel.trim() || '(47) 99999-9999',
       vice_lider_nome: novoViceLider.trim() || undefined,
       anfitriao_nome: novoAnfitriao.trim() || undefined,
       dia_semana: novoDia,
       horario: novoHorario,
       bairro: novoBairro.trim() || 'Centro',
-      endereco: novoEndereco.trim() || `${novoBairro}, Cascavel - PR`,
+      endereco: novoEndereco.trim() || `${novoBairro}, Joinville - SC`,
       maps_url: mapsUrl,
       membros: [
         {
           id: `m-lider-${Date.now()}`,
           nome: novoLiderNome.trim(),
-          telefone: novoLiderTel.trim() || '(45) 99999-9999',
+          telefone: novoLiderTel.trim() || '(47) 99999-9999',
           tempo_celula: '1 ano+',
           batizado: true,
           funcao: 'Líder',
@@ -199,7 +233,9 @@ export const CelulasView: React.FC = () => {
       ],
     });
 
-    sucesso('Célula cadastrada com sucesso!');
+    adicionarCelula(celulaCriada);
+
+    sucesso('Célula cadastrada com sucesso e sincronizada com o Supabase!');
     setModalNovaCelula(false);
     setNovaNome('');
     setNovoLiderNome('');
@@ -211,7 +247,7 @@ export const CelulasView: React.FC = () => {
   };
 
   // Salvar Novo Membro na Célula Selecionada
-  const handleAdicionarMembro = (e: React.FormEvent) => {
+  const handleAdicionarMembro = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!celulaSelecionada) return;
 
@@ -220,35 +256,34 @@ export const CelulasView: React.FC = () => {
       return;
     }
 
-    adicionarMembroCelula(celulaSelecionada.id, {
+    const novoMembro: CelulaMembro = {
+      id: `m-${Date.now()}`,
       nome: membroNome.trim(),
-      telefone: membroTel.trim() || '(45) 99999-9999',
+      telefone: membroTel.trim() || '(47) 99999-9999',
       tempo_celula: membroTempo,
       batizado: membroBatizado,
       funcao: membroFuncao,
-    });
+    };
+
+    adicionarMembroCelula(celulaSelecionada.id, novoMembro);
+
+    const membrosAtualizados = [...celulaSelecionada.membros, novoMembro];
 
     // Atualiza estado local da célula aberta no modal
     setCelulaSelecionada((prev) =>
       prev
         ? {
             ...prev,
-            membros: [
-              ...prev.membros,
-              {
-                id: `m-${Date.now()}`,
-                nome: membroNome.trim(),
-                telefone: membroTel.trim() || '(45) 99999-9999',
-                tempo_celula: membroTempo,
-                batizado: membroBatizado,
-                funcao: membroFuncao,
-              },
-            ],
+            membros: membrosAtualizados,
           }
         : null
     );
 
-    sucesso(`${membroNome.trim()} adicionado(a) à célula!`);
+    await atualizarCelulaSupabase(celulaSelecionada.id, {
+      membros: membrosAtualizados,
+    });
+
+    sucesso(`${membroNome.trim()} adicionado(a) à célula e salvo no Supabase!`);
     setMembroNome('');
     setMembroTel('');
   };
@@ -274,6 +309,18 @@ export const CelulasView: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <Button
+            variant="ghost"
+            size="md"
+            onClick={handleRecarregarCelulas}
+            isLoading={carregandoCelulas}
+            title="Atualizar lista de células do Supabase"
+            className="flex-1 sm:flex-initial border border-[#E4E4E7]"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${carregandoCelulas ? 'animate-spin' : ''}`} />
+            <span>Atualizar</span>
+          </Button>
+
           <Button
             variant="secondary"
             size="md"

@@ -22,16 +22,21 @@ import {
   Check,
   Sparkles,
   ExternalLink,
+  RefreshCw,
 } from 'lucide-react';
 
 export interface AdminHeaderProps {
   onLogout?: () => void;
   igrejaNome?: string;
+  onAtualizar?: () => Promise<void> | void;
+  carregando?: boolean;
 }
 
 export const AdminHeader: React.FC<AdminHeaderProps> = ({
   onLogout,
   igrejaNome,
+  onAtualizar,
+  carregando = false,
 }) => {
   const {
     abaAtiva,
@@ -216,8 +221,25 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
           </div>
         </div>
 
-        {/* Controles de Lado Direito: Notificações, Perfil Ativo, Dark Mode, Tema e Logout */}
+        {/* Controles de Lado Direito: Notificações, Atualizar Supabase, Perfil Ativo, Dark Mode, Tema e Logout */}
         <div className="flex items-center space-x-2 sm:space-x-3">
+          {/* Botão de Sincronizar / Atualizar Supabase */}
+          {onAtualizar && (
+            <button
+              type="button"
+              onClick={onAtualizar}
+              disabled={carregando}
+              className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-[#F4F4F5] border border-[#E4E4E7] text-[#0A0A0A] hover:border-black transition-colors cursor-pointer text-xs font-bold ${
+                carregando ? 'opacity-60 cursor-not-allowed' : ''
+              }`}
+              title="Atualizar dados em tempo real com o Supabase"
+              aria-label="Atualizar dados do Supabase"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${carregando ? 'animate-spin text-black' : 'text-[#52525B]'}`} />
+              <span className="hidden sm:inline">Atualizar</span>
+            </button>
+          )}
+
           {/* Central de Notificações com Badge Discreto */}
           <div className="relative" ref={notifRef}>
             <button

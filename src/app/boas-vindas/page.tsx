@@ -7,6 +7,7 @@ import { useAdminStore } from '../../store/adminStore';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { useToast } from '../../hooks/useToast';
+import { salvarVisitanteSupabase } from '../../lib/eventoAdapter';
 import {
   HeartHandshake,
   CheckCircle2,
@@ -60,7 +61,9 @@ export default function BoasVindasPage() {
     );
   }, [bairro, endereco, celulas]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [salvando, setSalvando] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!nome.trim()) {
@@ -73,7 +76,7 @@ export default function BoasVindasPage() {
       return;
     }
 
-    adicionarVisitante({
+    const payload = {
       nome: nome.trim(),
       sexo,
       culto_origem: cultoOrigem,
@@ -88,9 +91,19 @@ export default function BoasVindasPage() {
       quer_celula: jaParticipaCelula ? false : querCelula,
       pedido_oracao: pedidoOracao.trim() || undefined,
       data_visita: new Date().toISOString().split('T')[0],
-      status: 'novo',
+      status: 'novo' as const,
       cadastrado_por: 'Auto-atendimento // Visitante',
-    });
+    };
+
+    setSalvando(true);
+    try {
+      await salvarVisitanteSupabase(payload);
+      adicionarVisitante(payload);
+    } catch {
+      adicionarVisitante(payload);
+    } finally {
+      setSalvando(false);
+    }
 
     sucesso('Seja muito bem-vindo(a) à nossa congregação!');
     setEnviadoComSucesso(true);

@@ -22,17 +22,43 @@ import {
   Trash2,
   ChevronRight,
   Share2,
+  RefreshCw,
 } from 'lucide-react';
+import {
+  salvarVisitanteSupabase,
+  buscarVisitantesSupabase,
+} from '../../lib/eventoAdapter';
 
 export const ConexaoView: React.FC = () => {
   const { sucesso, info } = useToast();
   const {
     visitantes,
+    setVisitantes,
     adicionarVisitante,
     atualizarStatusVisitante,
     removerVisitante,
     igrejaConfig,
   } = useAdminStore();
+
+  const [carregandoVisitantes, setCarregandoVisitantes] = useState(false);
+
+  // Recarregar visitantes do Supabase
+  const handleRecarregarVisitantes = async () => {
+    setCarregandoVisitantes(true);
+    try {
+      const viss = await buscarVisitantesSupabase();
+      if (viss && viss.length > 0) {
+        setVisitantes(viss);
+        sucesso(`Visitantes sincronizados com o Supabase! (${viss.length} conexões)`);
+      } else {
+        info('Nenhum visitante retornado do banco.');
+      }
+    } catch {
+      info('Não foi possível sincronizar os visitantes.');
+    } finally {
+      setCarregandoVisitantes(false);
+    }
+  };
 
   // Estados de controle da interface
   const [busca, setBusca] = useState('');
@@ -108,7 +134,7 @@ export const ConexaoView: React.FC = () => {
       return;
     }
 
-    adicionarVisitante({
+    const novoObj: Omit<VisitanteConexao, 'id'> = {
       nome: novoNome.trim(),
       sexo: novoSexo,
       telefone: novoTelefone.trim(),
@@ -120,9 +146,12 @@ export const ConexaoView: React.FC = () => {
       data_visita: new Date().toISOString().split('T')[0],
       status: 'novo',
       cadastrado_por: novoCadastradoPor.trim(),
-    });
+    };
 
-    sucesso(`${novoNome.trim()} cadastrado(a) na Conexão com sucesso!`);
+    adicionarVisitante(novoObj);
+    salvarVisitanteSupabase(novoObj).catch((e) => console.warn('Erro ao salvar visitante:', e));
+
+    sucesso(`${novoNome.trim()} cadastrado(a) na Conexão e salvo no Supabase!`);
 
     // Limpa formulário e fecha modal
     setNovoNome('');
@@ -171,6 +200,18 @@ export const ConexaoView: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <Button
+            variant="ghost"
+            size="md"
+            className="flex-1 sm:flex-initial border border-[#E4E4E7]"
+            onClick={handleRecarregarVisitantes}
+            isLoading={carregandoVisitantes}
+            title="Atualizar lista de pessoas da Conexão do Supabase"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${carregandoVisitantes ? 'animate-spin' : ''}`} />
+            <span>Atualizar</span>
+          </Button>
+
           <Button
             variant="secondary"
             size="md"

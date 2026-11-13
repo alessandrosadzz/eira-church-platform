@@ -122,6 +122,7 @@ interface AdminStore {
 
   // Módulo Conexão (Pessoas Novas / Visitantes)
   visitantes: VisitanteConexao[];
+  setVisitantes: (visitantes: VisitanteConexao[]) => void;
   adicionarVisitante: (visitante: Omit<VisitanteConexao, 'id'>) => void;
   atualizarStatusVisitante: (
     id: string,
@@ -131,6 +132,8 @@ interface AdminStore {
 
   // Módulo Células
   celulas: Celula[];
+  setCelulas: (celulas: Celula[]) => void;
+  setLideres: (lideres: LiderConta[]) => void;
   adicionarCelula: (celula: Omit<Celula, 'id'>) => void;
   atualizarCelula: (id: string, celula: Partial<Celula>) => void;
   removerCelula: (id: string) => void;
@@ -239,6 +242,33 @@ export const useAdminStore = create<AdminStore>((set) => ({
       return { lideres: listaAtualizada, atividadesLideres: novasAtividades };
     }),
 
+  setLideres: (lideres) => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('eira_lideres', JSON.stringify(lideres));
+      } catch {}
+    }
+    set({ lideres });
+  },
+
+  setCelulas: (celulas) => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('eira_celulas', JSON.stringify(celulas));
+      } catch {}
+    }
+    set({ celulas });
+  },
+
+  setVisitantes: (visitantes) => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('eira_visitantes', JSON.stringify(visitantes));
+      } catch {}
+    }
+    set({ visitantes });
+  },
+
   validarLogin: (usuarioOuEmail, senha) => {
     const u = usuarioOuEmail.trim().toLowerCase();
     const s = senha.trim();
@@ -260,6 +290,18 @@ export const useAdminStore = create<AdminStore>((set) => ({
     );
     if (liderEncontrado) {
       return { valido: true, role: 'lider', nome: liderEncontrado.nome };
+    }
+
+    // 4. Líderes cadastrados no Supabase (metadados na célula)
+    for (const cel of state.celulas) {
+      if (cel.anfitriao_nome && cel.anfitriao_nome.startsWith('{')) {
+        try {
+          const meta = JSON.parse(cel.anfitriao_nome);
+          if (meta.usuario && meta.usuario.trim().toLowerCase() === u && meta.senha === s) {
+            return { valido: true, role: 'lider', nome: cel.lider_nome };
+          }
+        } catch {}
+      }
     }
 
     return { valido: false };

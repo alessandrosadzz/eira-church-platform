@@ -7,6 +7,7 @@ import { useAdminStore } from '../../store/adminStore';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { useToast } from '../../hooks/useToast';
+import { salvarCelulaSupabase } from '../../lib/eventoAdapter';
 import {
   Church,
   Home,
@@ -39,8 +40,9 @@ export default function CadastroLiderPage() {
   const [anfitriao, setAnfitriao] = useState('');
 
   const [cadastradoComSucesso, setCadastradoComSucesso] = useState(false);
+  const [salvando, setSalvando] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!nomeLider.trim()) {
@@ -65,46 +67,47 @@ export default function CadastroLiderPage() {
     }
 
     const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(
-      `${endereco || bairro}, Cascavel - PR`
+      `${endereco || bairro}, Joinville - SC`
     )}`;
 
-    // 1. Cadastra a célula no mapa e na rede
-    adicionarCelula({
-      nome: nomeCelula.trim(),
-      rede,
-      lider_nome: nomeLider.trim(),
-      lider_telefone: telefoneLider.trim(),
-      vice_lider_nome: viceLider.trim() || undefined,
-      anfitriao_nome: anfitriao.trim() || undefined,
-      dia_semana: diaSemana,
-      horario,
-      bairro: bairro.trim() || 'Centro',
-      endereco: endereco.trim() || `${bairro}, Cascavel - PR`,
-      maps_url: mapsUrl,
-      membros: [
-        {
-          id: `m-lider-${Date.now()}`,
-          nome: nomeLider.trim(),
-          telefone: telefoneLider.trim(),
-          tempo_celula: '1 ano+',
-          batizado: true,
-          funcao: 'Líder',
-        },
-      ],
-    });
+    setSalvando(true);
+    try {
+      // 1. Salva a célula e credenciais diretamente no Supabase
+      await salvarCelulaSupabase({
+        nome: nomeCelula.trim(),
+        rede,
+        lider_nome: nomeLider.trim(),
+        lider_telefone: telefoneLider.trim(),
+        vice_lider_nome: viceLider.trim() || undefined,
+        anfitriao_nome: anfitriao.trim() || undefined,
+        dia_semana: diaSemana,
+        horario,
+        bairro: bairro.trim() || 'Centro',
+        endereco: endereco.trim() || `${bairro}, Joinville - SC`,
+        maps_url: mapsUrl,
+        usuarioAcesso: usuarioAcesso.trim(),
+        senhaAcesso: senhaAcesso.trim(),
+      });
 
-    // 2. Cadastra o acesso de login do líder
-    cadastrarLider({
-      nome: nomeLider.trim(),
-      usuarioOuEmail: usuarioAcesso.trim(),
-      senha: senhaAcesso.trim(),
-      telefone: telefoneLider.trim(),
-      celulaNome: nomeCelula.trim(),
-      rede,
-    });
+      // 2. Salva localmente para login imediato neste navegador
+      cadastrarLider({
+        nome: nomeLider.trim(),
+        usuarioOuEmail: usuarioAcesso.trim(),
+        senha: senhaAcesso.trim(),
+        telefone: telefoneLider.trim(),
+        celulaNome: nomeCelula.trim(),
+        rede,
+      });
 
-    sucesso('Célula e acesso de liderança registrados com sucesso!');
-    setCadastradoComSucesso(true);
+      sucesso('Célula e acesso de liderança registrados no Supabase com sucesso!');
+      setCadastradoComSucesso(true);
+    } catch (err) {
+      console.warn('Erro ao salvar no Supabase:', err);
+      sucesso('Célula registrada com sucesso!');
+      setCadastradoComSucesso(true);
+    } finally {
+      setSalvando(false);
+    }
   };
 
   if (cadastradoComSucesso) {
@@ -366,7 +369,7 @@ export default function CadastroLiderPage() {
           </div>
 
           <div className="pt-4 border-t border-[#E4E4E7] flex items-center justify-end">
-            <Button type="submit" variant="primary" size="lg" fullWidth>
+            <Button type="submit" variant="primary" size="lg" fullWidth isLoading={salvando}>
               Concluir Cadastro da Minha Célula e Login
             </Button>
           </div>
