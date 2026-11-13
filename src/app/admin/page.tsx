@@ -271,7 +271,7 @@ export default function AdminPage() {
   }, [isLiderCelula, abaAtiva, setAbaAtiva]);
 
   useEffect(() => {
-    if (isLider12 && (abaAtiva === 'configuracao' || abaAtiva === 'novo-evento')) {
+    if (isLider12 && abaAtiva === 'configuracao') {
       setAbaAtiva('dashboard');
     }
   }, [isLider12, abaAtiva, setAbaAtiva]);
@@ -532,6 +532,9 @@ export default function AdminPage() {
             </p>
             <p>
               • <strong>Administração:</strong> usuário <code className="bg-[#141418] px-1 py-0.5 rounded text-[var(--accent,#FACC15)] font-bold">admin</code>
+            </p>
+            <p>
+              • <strong>Líder de Rede (12):</strong> usuário <code className="bg-[#141418] px-1 py-0.5 rounded text-[var(--accent,#FACC15)] font-bold">lider12</code> ou suas credenciais individuais
             </p>
             <p className="pt-1 text-[#E4E4E7]">
               • <strong>Líder de Célula:</strong> Já cadastrou sua célula? Use seu usuário. Ainda não?{' '}
@@ -1194,7 +1197,9 @@ export default function AdminPage() {
                   {/* Bloco de Eventos, Inscrições e Arrecadação */}
                   <div className="space-y-4 text-left">
                     <h3 className="font-extrabold text-base text-[#0A0A0A]">
-                      Eventos Oficiais & Arrecadação
+                      {podeAcessarFinancas
+                        ? 'Eventos Oficiais & Arrecadação'
+                        : 'Eventos Oficiais & Inscrições'}
                     </h3>
 
                     <div ref={cardsRef} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1211,22 +1216,36 @@ export default function AdminPage() {
                           metricas.total > 0
                             ? Math.round((metricas.confirmados / metricas.total) * 100)
                             : 0
-                        }% de conversão`}
+                        }% de confirmação`}
                         icone={CheckCircle2}
                       />
                       <MetricCard
                         titulo="Pagamentos Pendentes"
                         valor={metricas.pendentes}
-                        subtexto="Aguardando confirmação"
+                        subtexto="Aguardando validação"
                         icone={Clock}
                       />
-                      <MetricCard
-                        titulo="Receita Confirmada"
-                        valor={formatarMoeda(metricas.receita)}
-                        subtexto="Pix, cartão e balcão"
-                        icone={DollarSign}
-                        destaque
-                      />
+                      {podeAcessarFinancas ? (
+                        <MetricCard
+                          titulo="Receita Confirmada"
+                          valor={formatarMoeda(metricas.receita)}
+                          subtexto="Pix, cartão e balcão"
+                          icone={DollarSign}
+                          destaque
+                        />
+                      ) : (
+                        <MetricCard
+                          titulo="Taxa de Confirmação"
+                          valor={`${
+                            metricas.total > 0
+                              ? Math.round((metricas.confirmados / metricas.total) * 100)
+                              : 0
+                          }%`}
+                          subtexto={`${metricas.confirmados} de ${metricas.total} validados`}
+                          icone={Sparkles}
+                          destaque
+                        />
+                      )}
                     </div>
                   </div>
 

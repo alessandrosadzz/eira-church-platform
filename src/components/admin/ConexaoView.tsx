@@ -88,7 +88,7 @@ export const ConexaoView: React.FC = () => {
   const [novaFaixaEtaria, setNovaFaixaEtaria] = useState<
     VisitanteConexao['faixa_etaria']
   >('Jovem (18-29)');
-  const [novoQuerCelula, setNovoQuerCelula] = useState(true);
+  const [novoJaParticipaCelula, setNovoJaParticipaCelula] = useState(false);
   const [novoPedidoOracao, setNovoPedidoOracao] = useState('');
   const [novoCadastradoPor, setNovoCadastradoPor] = useState('Equipe Conexão');
 
@@ -96,9 +96,10 @@ export const ConexaoView: React.FC = () => {
   const metricas = useMemo(() => {
     const total = visitantes.length;
     const novos = visitantes.filter((v) => v.status === 'novo').length;
-    const querCelula = visitantes.filter((v) => v.quer_celula).length;
-    const taxaCelula = total > 0 ? Math.round((querCelula / total) * 100) : 0;
-    return { total, novos, taxaCelula };
+    const jaParticipam = visitantes.filter((v) => v.ja_participa_celula).length;
+    const aindaNao = total - jaParticipam;
+    const taxaParticipa = total > 0 ? Math.round((jaParticipam / total) * 100) : 0;
+    return { total, novos, jaParticipam, aindaNao, taxaParticipa };
   }, [visitantes]);
 
   // Lista filtrada
@@ -141,8 +142,10 @@ export const ConexaoView: React.FC = () => {
       bairro: novoBairro.trim() || 'Não informado',
       quem_convidou: novoQuemConvidou.trim() || 'Culto de Domingo',
       faixa_etaria: novaFaixaEtaria,
-      quer_celula: novoQuerCelula,
+      ja_participa_celula: novoJaParticipaCelula,
+      quer_celula: !novoJaParticipaCelula,
       pedido_oracao: novoPedidoOracao.trim() || undefined,
+      observacoes: novoJaParticipaCelula ? 'Já participa de célula' : 'Ainda não participa de célula',
       data_visita: new Date().toISOString().split('T')[0],
       status: 'novo',
       cadastrado_por: novoCadastradoPor.trim(),
@@ -159,6 +162,7 @@ export const ConexaoView: React.FC = () => {
     setNovoTelefone('');
     setNovoBairro('');
     setNovoQuemConvidou('');
+    setNovoJaParticipaCelula(false);
     setNovoPedidoOracao('');
     setModalCadastroAberto(false);
   };
@@ -272,12 +276,12 @@ export const ConexaoView: React.FC = () => {
         <div className="p-4 sm:p-5 rounded-[var(--radius-box,0.75rem)] bg-white border border-[#E4E4E7] shadow-sm flex items-center justify-between">
           <div>
             <span className="text-[11px] font-bold text-[#71717A] uppercase tracking-wider block">
-              Interesse em Célula
+              Participação em Célula
             </span>
             <p className="text-2xl sm:text-3xl font-extrabold text-[#0A0A0A] tabular-nums mt-1">
-              {metricas.taxaCelula}%
+              {metricas.jaParticipam} <span className="text-xs font-semibold text-[#71717A]">({metricas.taxaParticipa}%)</span>
             </p>
-            <span className="text-xs text-[#16A34A] font-bold">Desejam acompanhamento</span>
+            <span className="text-xs text-[#16A34A] font-bold">{metricas.aindaNao} ainda não participam</span>
           </div>
           <div className="p-3 rounded-lg bg-[#DCFCE7] text-[#166534]">
             <Sparkles className="w-5 h-5" />
@@ -428,11 +432,11 @@ export const ConexaoView: React.FC = () => {
                       <strong className="text-[#0A0A0A]">Quem convidou:</strong> {v.quem_convidou}
                     </p>
                     <p className="text-[#52525B]">
-                      <strong className="text-[#0A0A0A]">Interesse em Célula:</strong>{' '}
-                      {v.quer_celula ? (
-                        <span className="text-[#16A34A] font-bold">Sim, quer participar!</span>
+                      <strong className="text-[#0A0A0A]">Participa de Célula:</strong>{' '}
+                      {v.ja_participa_celula ? (
+                        <span className="text-[#16A34A] font-bold">Sim, já participo</span>
                       ) : (
-                        <span className="text-[#71717A]">Ainda não tem interesse</span>
+                        <span className="text-[#71717A] font-medium">Ainda não</span>
                       )}
                     </p>
                     {v.pedido_oracao && (
@@ -593,19 +597,32 @@ export const ConexaoView: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-tight text-[#0A0A0A] mb-1.5">
-                    Deseja participar de uma célula?
+                    Você já participa de uma célula?
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => setNovoQuerCelula(!novoQuerCelula)}
-                    className={`w-full h-12 px-3 rounded-lg border text-xs font-bold flex items-center justify-center space-x-2 transition-colors cursor-pointer ${
-                      novoQuerCelula
-                        ? 'bg-[#DCFCE7] text-[#166534] border-[#BBF7D0]'
-                        : 'bg-[#F4F4F5] text-[#71717A] border-[#E4E4E7]'
-                    }`}
-                  >
-                    <span>{novoQuerCelula ? '✓ Sim, quer conhecer' : 'Ainda não'}</span>
-                  </button>
+                  <div className="grid grid-cols-2 gap-2 h-12">
+                    <button
+                      type="button"
+                      onClick={() => setNovoJaParticipaCelula(false)}
+                      className={`px-3 rounded-lg border text-xs font-bold flex items-center justify-center transition-all cursor-pointer ${
+                        !novoJaParticipaCelula
+                          ? 'bg-black text-[var(--accent,#FACC15)] border-black shadow-xs'
+                          : 'bg-[#FAFAFA] text-[#71717A] border-[#E4E4E7] hover:border-black'
+                      }`}
+                    >
+                      Ainda não
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNovoJaParticipaCelula(true)}
+                      className={`px-3 rounded-lg border text-xs font-bold flex items-center justify-center transition-all cursor-pointer ${
+                        novoJaParticipaCelula
+                          ? 'bg-black text-[var(--accent,#FACC15)] border-black shadow-xs'
+                          : 'bg-[#FAFAFA] text-[#71717A] border-[#E4E4E7] hover:border-black'
+                      }`}
+                    >
+                      Sim, já participo
+                    </button>
+                  </div>
                 </div>
               </div>
 

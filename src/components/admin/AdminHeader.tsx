@@ -178,11 +178,12 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
 
     if (isLider12) {
       return [
-        { id: 'dashboard' as AbaAdmin, label: 'Painel da Rede de 12', icon: Church },
+        { id: 'dashboard' as AbaAdmin, label: 'Painel da Rede', icon: Church },
         { id: 'conexao' as AbaAdmin, label: 'Conexão // Visitantes', icon: HeartHandshake },
         { id: 'celulas' as AbaAdmin, label: 'Rede de Células', icon: Home },
-        { id: 'inscricoes' as AbaAdmin, label: 'Inscrições', icon: Users },
-        { id: 'eventos' as AbaAdmin, label: 'Eventos Oficiais', icon: Calendar },
+        { id: 'inscricoes' as AbaAdmin, label: 'Gestão de Inscrições', icon: Users },
+        { id: 'eventos' as AbaAdmin, label: 'Gerenciar Eventos', icon: Calendar },
+        { id: 'novo-evento' as AbaAdmin, label: '+ Novo Evento', icon: PlusCircle },
       ];
     }
 
@@ -364,7 +365,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                 : usuarioRole === 'admin'
                 ? 'Perfil: ADM'
                 : usuarioRole === 'lider_12'
-                ? 'Perfil: Líder de 12'
+                ? 'Perfil: Líder de Rede (12)'
                 : 'Perfil: Líder de Célula'}
             </span>
           </div>

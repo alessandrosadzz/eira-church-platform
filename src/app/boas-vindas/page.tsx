@@ -362,7 +362,7 @@ export default function BoasVindasPage() {
 
             <div className="md:col-span-2 space-y-3 pt-2 border-t border-[#F4F4F5]">
               <label className="block text-xs font-bold uppercase tracking-tight text-[#0A0A0A]">
-                Você já faz parte de alguma célula da {igrejaConfig.nome}?
+                Você já participa de uma célula?
               </label>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -378,7 +378,7 @@ export default function BoasVindasPage() {
                       : 'bg-[#FAFAFA] text-[#71717A] border-[#E4E4E7] hover:border-black'
                   }`}
                 >
-                  <p className="text-xs font-bold">Não participo de célula ainda</p>
+                  <p className="text-xs font-bold">Ainda não</p>
                   <span className={`text-[10px] ${!jaParticipaCelula ? 'text-[#D4D4D8]' : 'text-[#71717A]'}`}>
                     Gostaria de conhecer um grupo pertinho de mim
                   </span>
@@ -396,7 +396,7 @@ export default function BoasVindasPage() {
                       : 'bg-[#FAFAFA] text-[#71717A] border-[#E4E4E7] hover:border-black'
                   }`}
                 >
-                  <p className="text-xs font-bold">Sim, já faço parte de uma célula</p>
+                  <p className="text-xs font-bold">Sim, já participo</p>
                   <span className={`text-[10px] ${jaParticipaCelula ? 'text-[#D4D4D8]' : 'text-[#71717A]'}`}>
                     Já sou membro integrado de uma célula
                   </span>

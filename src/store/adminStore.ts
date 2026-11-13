@@ -316,8 +316,17 @@ export const useAdminStore = create<AdminStore>((set, get) => ({
     }
 
     // 3. Líderes de 12 (Discipuladores / Supervisores de Rede)
-    if ((u === 'lider12' || u === 'lideres12' || u === 'rede12' || u === 'discipulador') && s === 'eira@1212') {
-      return { valido: true, role: 'lider_12', nome: 'Liderança dos 12' };
+    if (
+      (u === 'lider12' ||
+        u === 'lideres12' ||
+        u === 'rede12' ||
+        u === 'redede12' ||
+        u === 'liderrede' ||
+        u === 'liderderede' ||
+        u === 'discipulador') &&
+      s === 'eira@1212'
+    ) {
+      return { valido: true, role: 'lider_12', nome: 'Liderança de Rede (12)' };
     }
 
     // 4. Líderes de Célula e Líderes de 12 Cadastrados Localmente
