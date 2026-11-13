@@ -57,6 +57,7 @@ import {
   Send,
   Info,
   CalendarCheck,
+  Crown,
 } from 'lucide-react';
 
 export default function AdminPage() {
@@ -249,6 +250,75 @@ export default function AdminPage() {
     totalMembrosCelulas > 0
       ? Math.round((totalBatizadosCelulas / totalMembrosCelulas) * 100)
       : 0;
+
+  // Papéis de Acesso e Permissões
+  const isLiderCelula = usuarioRole === 'lider_celula' || usuarioRole === 'lider';
+  const isLider12 = usuarioRole === 'lider_12';
+  const isDiretoria = usuarioRole === 'pastor' || usuarioRole === 'admin';
+  const podeAcessarFinancas = isDiretoria;
+
+  // Proteção estrita de abas por perfil
+  useEffect(() => {
+    if (
+      isLiderCelula &&
+      (abaAtiva === 'eventos' ||
+        abaAtiva === 'novo-evento' ||
+        abaAtiva === 'inscricoes' ||
+        abaAtiva === 'configuracao')
+    ) {
+      setAbaAtiva('dashboard');
+    }
+  }, [isLiderCelula, abaAtiva, setAbaAtiva]);
+
+  useEffect(() => {
+    if (isLider12 && (abaAtiva === 'configuracao' || abaAtiva === 'novo-evento')) {
+      setAbaAtiva('dashboard');
+    }
+  }, [isLider12, abaAtiva, setAbaAtiva]);
+
+  // Identifica a célula pertencente ao líder autenticado
+  const celulaDoLider = useMemo(() => {
+    if (!usuarioNomeLogado && !usuarioLogin) return celulas[0] || null;
+    const nomeNorm = (usuarioNomeLogado || usuarioLogin).toLowerCase().trim();
+    const celEncontrada = celulas.find((c) => {
+      if (c.lider_nome && c.lider_nome.toLowerCase().trim().includes(nomeNorm)) return true;
+      if (c.anfitriao_nome && c.anfitriao_nome.startsWith('{')) {
+        try {
+          const meta = JSON.parse(c.anfitriao_nome);
+          if (
+            meta.usuario &&
+            (meta.usuario.toLowerCase().trim() === nomeNorm ||
+              meta.usuario.toLowerCase().trim() === usuarioLogin.toLowerCase().trim())
+          ) {
+            return true;
+          }
+        } catch {}
+      }
+      return false;
+    });
+    return celEncontrada || celulas[0] || null;
+  }, [celulas, usuarioNomeLogado, usuarioLogin]);
+
+  const membrosDaMinhaCelula = useMemo(() => {
+    return celulaDoLider?.membros || [];
+  }, [celulaDoLider]);
+
+  const totalMembrosMinhaCelula = membrosDaMinhaCelula.length;
+  const batizadosMinhaCelula = membrosDaMinhaCelula.filter((m) => m.batizado).length;
+  const pctBatizadosMinhaCelula =
+    totalMembrosMinhaCelula > 0
+      ? Math.round((batizadosMinhaCelula / totalMembrosMinhaCelula) * 100)
+      : 0;
+
+  // Visitantes do mesmo bairro da célula do líder
+  const visitantesDoMeuBairro = useMemo(() => {
+    if (!celulaDoLider?.bairro) return visitantes.slice(0, 5);
+    const bNorm = celulaDoLider.bairro.toLowerCase().trim();
+    const proximos = visitantes.filter(
+      (v) => v.bairro && v.bairro.toLowerCase().trim().includes(bNorm)
+    );
+    return proximos.length > 0 ? proximos : visitantes.slice(0, 5);
+  }, [visitantes, celulaDoLider]);
 
   // Visitantes Filtrados pelo Período Selecionado
   const visitantesNoPeriodo = useMemo(() => {
@@ -484,8 +554,7 @@ export default function AdminPage() {
     );
   }
 
-  // Verifica se o usuário atual tem permissão para visualizar finanças (Pastores e Admins apenas)
-  const podeAcessarFinancas = usuarioRole === 'pastor' || usuarioRole === 'admin';
+  // Verifica permissão para finanças (já computada em podeAcessarFinancas)
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] flex flex-col transition-colors">
@@ -523,7 +592,7 @@ export default function AdminPage() {
                   </div>
 
                   <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-                    Painel {usuarioRole === 'lider' ? 'da Liderança de Célula' : 'Pastoral & Administrativo'} // {igrejaConfig.nome}
+                    Painel {isLiderCelula ? 'da Liderança de Célula' : isLider12 ? 'da Liderança dos 12' : 'Pastoral & Administrativo'} // {igrejaConfig.nome}
                   </h2>
                   <p className="text-xs sm:text-sm text-[#A1A1AA] leading-relaxed">
                     {igrejaConfig.slogan}. Acompanhe almas acolhidas, rede de células, frequência e a expansão do Reino de Deus.
@@ -563,34 +632,46 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <div className="p-4 rounded-xl bg-white border border-[#E4E4E7] shadow-xs flex items-center justify-between">
-                  <div className="space-y-0.5 text-left">
-                    <p className="text-xs font-extrabold text-[#0A0A0A]">Cadastro de Líder</p>
-                    <p className="text-[11px] text-[#71717A]">Link para novos líderes de célula</p>
+                {!isLiderCelula ? (
+                  <div className="p-4 rounded-xl bg-white border border-[#E4E4E7] shadow-xs flex items-center justify-between">
+                    <div className="space-y-0.5 text-left">
+                      <p className="text-xs font-extrabold text-[#0A0A0A]">Convites de Liderança</p>
+                      <p className="text-[11px] text-[#71717A]">Exclusivo Líderes de 12 e Pastores</p>
+                    </div>
+                    <div className="flex items-center space-x-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const origin = typeof window !== 'undefined' ? window.location.origin : '';
+                          const url = `${origin}/cadastro-lider?tipo=lider_celula&por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`;
+                          navigator.clipboard.writeText(url);
+                          sucesso('Link de convite para Líder de Célula copiado!');
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-[#0A0A0A] text-[var(--accent,#FACC15)] hover:bg-[#27272A] transition-colors flex items-center space-x-1 cursor-pointer"
+                        title="Copiar link de convite"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>Copiar</span>
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-1.5">
-                    <a
-                      href="/cadastro-lider"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-[#F4F4F5] hover:bg-[#E4E4E7] text-[#0A0A0A] transition-colors"
+                ) : (
+                  <div className="p-4 rounded-xl bg-white border border-[#E4E4E7] shadow-xs flex items-center justify-between">
+                    <div className="space-y-0.5 text-left">
+                      <p className="text-xs font-extrabold text-[#0A0A0A]">Minha Célula</p>
+                      <p className="text-[11px] text-[#71717A] truncate max-w-[150px]">
+                        {celulaDoLider?.nome || 'Cadastrar Célula'}
+                      </p>
+                    </div>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setAbaAtiva('celulas')}
                     >
-                      Abrir ↗
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const origin = typeof window !== 'undefined' ? window.location.origin : '';
-                        navigator.clipboard.writeText(`${origin}/cadastro-lider`);
-                        sucesso('Link de Cadastro de Líder copiado!');
-                      }}
-                      className="p-1.5 rounded-lg text-xs font-bold bg-[#0A0A0A] text-[var(--accent,#FACC15)] hover:bg-[#27272A] transition-colors"
-                      title="Copiar link"
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                    </button>
+                      Acessar ↗
+                    </Button>
                   </div>
-                </div>
+                )}
 
                 <div className="p-4 rounded-xl bg-white border border-[#E4E4E7] shadow-xs flex items-center justify-between">
                   <div className="space-y-0.5 text-left">
@@ -606,94 +687,429 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* SE LÍDER DE CÉLULA: Dashboard Focado em Células & Vida Comunitária (Sem Inscrições / Sem Pagamentos) */}
-              {usuarioRole === 'lider' ? (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between text-left">
-                    <div>
-                      <h3 className="text-base font-extrabold text-[#0A0A0A]">
-                        Métricas da Liderança de Célula
-                      </h3>
-                      <p className="text-xs text-[#71717A]">
-                        Acompanhe os discípulos da sua célula, batismos e pessoas do seu bairro.
+              {/* Gerador de Convites de Liderança (Exclusivo Líderes de 12 e Pastores) */}
+              {!isLiderCelula && (
+                <div className="p-5 rounded-[var(--radius-box,0.75rem)] bg-gradient-to-r from-[#18181B] to-[#0A0A0A] text-white border border-[#27272A] shadow-sm space-y-4 text-left">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#27272A] pb-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center space-x-2">
+                        <span className="p-1.5 rounded-lg bg-[var(--accent,#FACC15)] text-[var(--accent-text,#000000)]">
+                          <Crown className="w-4 h-4" />
+                        </span>
+                        <h3 className="font-extrabold text-base text-white">
+                          Gerador de Convites para a Liderança
+                        </h3>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-[#27272A] text-[var(--accent,#FACC15)] border border-[#3F3F46]">
+                          Exclusivo Líderes de 12 & Pastoral
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#A1A1AA]">
+                        Somente Líderes de 12 e Pastores podem criar e enviar links de cadastro para novos líderes de célula e novos líderes de 12.
                       </p>
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Card 1: Convite para Líder de Célula */}
+                    <div className="p-4 rounded-xl bg-[#27272A]/70 border border-[#3F3F46] space-y-3 flex flex-col justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <Users className="w-4 h-4 text-[var(--accent,#FACC15)]" />
+                          <span className="font-bold text-sm text-white">Novo Líder de Célula</span>
+                        </div>
+                        <p className="text-xs text-[#A1A1AA]">
+                          Gera o link exclusivo para um líder cadastrar sua célula, membros e gerenciar batismos.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const origin = typeof window !== 'undefined' ? window.location.origin : '';
+                            const url = `${origin}/cadastro-lider?tipo=lider_celula&por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`;
+                            navigator.clipboard.writeText(url);
+                            sucesso('Link de convite para Líder de Célula copiado com sucesso!');
+                          }}
+                          className="flex-1 py-2 px-3 rounded-lg text-xs font-bold bg-[var(--accent,#FACC15)] text-black hover:opacity-90 transition-opacity flex items-center justify-center space-x-1.5 cursor-pointer"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Copiar Link de Célula</span>
+                        </button>
+                        <a
+                          href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                            `Graça e paz! Segue o link oficial para você cadastrar a sua célula e ativar seu acesso de Líder na Eira Church: ${
+                              typeof window !== 'undefined' ? window.location.origin : ''
+                            }/cadastro-lider?tipo=lider_celula&por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`
+                          )}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-2 rounded-lg bg-[#22C55E] text-white hover:bg-[#16A34A] transition-colors"
+                          title="Enviar convite no WhatsApp"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* Card 2: Convite para Líder de 12 */}
+                    <div className="p-4 rounded-xl bg-[#27272A]/70 border border-[#3F3F46] space-y-3 flex flex-col justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <Crown className="w-4 h-4 text-amber-400" />
+                          <span className="font-bold text-sm text-white">Novo Líder de 12</span>
+                        </div>
+                        <p className="text-xs text-[#A1A1AA]">
+                          Gera o link para um discipulador/supervisor da Rede de 12 acessar visão ampla e gerar novos convites.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const origin = typeof window !== 'undefined' ? window.location.origin : '';
+                            const url = `${origin}/cadastro-lider?tipo=lider_12&por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`;
+                            navigator.clipboard.writeText(url);
+                            sucesso('Link de convite para Líder de 12 copiado com sucesso!');
+                          }}
+                          className="flex-1 py-2 px-3 rounded-lg text-xs font-bold bg-white text-black hover:bg-[#F4F4F5] transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Copiar Link dos 12</span>
+                        </button>
+                        <a
+                          href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                            `Graça e paz! Segue o link oficial para você cadastrar seu acesso como Líder de 12 na Eira Church: ${
+                              typeof window !== 'undefined' ? window.location.origin : ''
+                            }/cadastro-lider?tipo=lider_12&por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`
+                          )}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-2 rounded-lg bg-[#22C55E] text-white hover:bg-[#16A34A] transition-colors"
+                          title="Enviar convite no WhatsApp"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* SE LÍDER DE CÉLULA: Dashboard Focado Estritamente na Sua Célula, Batismos, Membros e Eventos */}
+              {isLiderCelula ? (
+                <div className="space-y-6 text-left">
+                  {/* Informações da Célula do Líder */}
+                  <div className="p-5 rounded-[var(--radius-box,0.75rem)] bg-white border border-[#E4E4E7] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center space-x-2">
+                        <span className="p-1.5 rounded-lg bg-[var(--accent,#FACC15)] text-[var(--accent-text,#000000)]">
+                          <Home className="w-4 h-4" />
+                        </span>
+                        <h3 className="font-extrabold text-base text-[#0A0A0A]">
+                          {celulaDoLider?.nome || 'Minha Célula'}
+                        </h3>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-[#F4F4F5] text-[#52525B]">
+                          Rede {celulaDoLider?.rede || 'Geral'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#71717A]">
+                        Líder Responsável: <strong className="text-black">{celulaDoLider?.lider_nome || usuarioNomeLogado}</strong> • Encontros toda <strong className="text-black">{celulaDoLider?.dia_semana || 'Quinta-feira'}</strong> às <strong className="text-black">{celulaDoLider?.horario || '20h00'}</strong> em <strong className="text-black">{celulaDoLider?.bairro || 'Joinville'}</strong>.
+                      </p>
+                    </div>
+
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => setAbaAtiva('celulas')}
+                    >
+                      <Home className="w-3.5 h-3.5 mr-1.5" />
+                      <span>Gerenciar Minha Célula</span>
+                    </Button>
+                  </div>
+
+                  {/* 4 Métricas Exclusivas da Célula do Líder */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     <MetricCard
-                      titulo="Células na Rede"
-                      valor={celulas.length}
-                      subtexto="Grupos em multiplicação"
-                      icone={Home}
-                    />
-                    <MetricCard
-                      titulo="Total de Integrantes"
-                      valor={totalMembrosCelulas}
-                      subtexto="Discípulos acompanhados"
+                      titulo="Integrantes da Célula"
+                      valor={totalMembrosMinhaCelula}
+                      subtexto="Discípulos na sua célula"
                       icone={Users}
                       destaque
                     />
                     <MetricCard
                       titulo="Batizados nas Águas"
-                      valor={`${totalBatizadosCelulas} (${percentualBatizados}%)`}
-                      subtexto="Almas firmadas na fé"
+                      valor={`${batizadosMinhaCelula} (${pctBatizadosMinhaCelula}%)`}
+                      subtexto="Membros batizados"
                       icone={Droplets}
                     />
                     <MetricCard
-                      titulo="Novos na Conexão"
-                      valor={visitantes.length}
-                      subtexto="Aguardando integração"
+                      titulo="Não Batizados"
+                      valor={Math.max(totalMembrosMinhaCelula - batizadosMinhaCelula, 0)}
+                      subtexto="Próximo passo na fé"
+                      icone={Clock}
+                    />
+                    <MetricCard
+                      titulo="Pessoas no Meu Bairro"
+                      valor={visitantesDoMeuBairro.length}
+                      subtexto={`No bairro ${celulaDoLider?.bairro || 'próximo'}`}
                       icone={HeartHandshake}
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div
-                      onClick={() => setAbaAtiva('celulas')}
-                      className="p-5 rounded-[var(--radius-box,0.75rem)] bg-white border border-[#E4E4E7] shadow-sm cursor-pointer hover:border-black transition-colors flex items-center justify-between text-left"
-                    >
-                      <div className="space-y-1">
-                        <span className="text-xs font-bold text-[#71717A] uppercase">
-                          Gerenciamento da Célula
-                        </span>
-                        <p className="text-lg font-black text-[#0A0A0A]">
-                          Ver Integrantes & Telefones
-                        </p>
-                        <p className="text-xs text-[#52525B] flex items-center">
-                          <span>Editar membros, cargos e batismo</span>
-                          <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                  {/* Tabela dos Integrantes da Célula com Data/Status de Batismo */}
+                  <div className="p-5 rounded-[var(--radius-box,0.75rem)] bg-white border border-[#E4E4E7] shadow-sm space-y-4">
+                    <div className="flex items-center justify-between border-b border-[#F4F4F5] pb-3">
+                      <div>
+                        <h4 className="font-extrabold text-sm text-[#0A0A0A]">
+                          Integrantes da Minha Célula & Batismo nas Águas
+                        </h4>
+                        <p className="text-xs text-[#71717A]">
+                          Lista de discípulos, cargos e confirmação de batismo nas águas.
                         </p>
                       </div>
-                      <div className="p-3 rounded-lg bg-[#DCFCE7] text-[#166534]">
-                        <Home className="w-6 h-6" />
-                      </div>
+
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setAbaAtiva('celulas')}
+                      >
+                        <span>+ Adicionar / Editar Membros</span>
+                      </Button>
                     </div>
 
-                    <div
-                      onClick={() => setAbaAtiva('conexao')}
-                      className="p-5 rounded-[var(--radius-box,0.75rem)] bg-white border border-[#E4E4E7] shadow-sm cursor-pointer hover:border-black transition-colors flex items-center justify-between text-left"
-                    >
-                      <div className="space-y-1">
-                        <span className="text-xs font-bold text-[#71717A] uppercase">
-                          Pessoas do Meu Bairro
-                        </span>
-                        <p className="text-lg font-black text-[#0A0A0A]">
-                          Acolhimento da Conexão
-                        </p>
-                        <p className="text-xs text-[#52525B] flex items-center">
-                          <span>Convidar visitantes para sua célula</span>
-                          <ArrowRight className="w-3.5 h-3.5 ml-1" />
-                        </p>
+                    {membrosDaMinhaCelula.length === 0 ? (
+                      <div className="p-8 text-center bg-[#FAFAFA] rounded-xl border border-dashed border-[#E4E4E7] space-y-3">
+                        <Users className="w-8 h-8 text-[#A1A1AA] mx-auto" />
+                        <div className="space-y-1">
+                          <p className="text-xs font-bold text-[#0A0A0A]">
+                            Nenhum integrante cadastrado na sua célula ainda
+                          </p>
+                          <p className="text-[11px] text-[#71717A]">
+                            Cadastre os membros da sua célula para registrar presença, batismo nas águas e contatos.
+                          </p>
+                        </div>
+                        <Button
+                          variant="dark"
+                          size="sm"
+                          onClick={() => setAbaAtiva('celulas')}
+                        >
+                          Adicionar Integrantes Agora
+                        </Button>
                       </div>
-                      <div className="p-3 rounded-lg bg-[#E0F2FE] text-[#075985]">
-                        <HeartHandshake className="w-6 h-6" />
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead>
+                            <tr className="border-b border-[#E4E4E7] text-[11px] font-bold text-[#71717A] uppercase">
+                              <th className="py-2.5 px-3">Nome</th>
+                              <th className="py-2.5 px-3">Função</th>
+                              <th className="py-2.5 px-3">WhatsApp</th>
+                              <th className="py-2.5 px-3">Tempo de Célula</th>
+                              <th className="py-2.5 px-3 text-center">Batizado nas Águas</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[#F4F4F5]">
+                            {membrosDaMinhaCelula.map((m) => (
+                              <tr key={m.id} className="hover:bg-[#FAFAFA]">
+                                <td className="py-3 px-3 font-bold text-[#0A0A0A]">
+                                  {m.nome}
+                                </td>
+                                <td className="py-3 px-3">
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#F4F4F5] text-[#52525B]">
+                                    {m.funcao}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-3">
+                                  {m.telefone ? (
+                                    <a
+                                      href={`https://wa.me/55${m.telefone.replace(/\D/g, '')}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="text-emerald-700 hover:underline font-mono font-medium"
+                                    >
+                                      {m.telefone}
+                                    </a>
+                                  ) : (
+                                    <span className="text-[#A1A1AA]">-</span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-3 text-[#52525B]">
+                                  {m.tempo_celula || 'Membro'}
+                                </td>
+                                <td className="py-3 px-3 text-center">
+                                  {m.batizado ? (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-[#DCFCE7] text-[#166534] border border-[#BBF7D0]">
+                                      <CheckCircle2 className="w-3 h-3 mr-1" />
+                                      <span>Batizado</span>
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-[#FEF2F2] text-[#991B1B] border border-[#FECACA]">
+                                      Não Batizado
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
+                    )}
+                  </div>
+
+                  {/* Visitantes do Meu Bairro */}
+                  <div className="p-5 rounded-[var(--radius-box,0.75rem)] bg-white border border-[#E4E4E7] shadow-sm space-y-4">
+                    <div className="flex items-center justify-between border-b border-[#F4F4F5] pb-3">
+                      <div className="flex items-center space-x-2">
+                        <HeartHandshake className="w-4 h-4 text-[#075985]" />
+                        <h4 className="font-extrabold text-sm text-[#0A0A0A]">
+                          Pessoas do Meu Bairro ({celulaDoLider?.bairro || 'Joinville'})
+                        </h4>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setAbaAtiva('conexao')}
+                      >
+                        Ver Todos na Conexão →
+                      </Button>
+                    </div>
+
+                    {visitantesDoMeuBairro.length === 0 ? (
+                      <p className="text-xs text-[#71717A] py-2">
+                        Nenhum visitante novo registrado recentemente no seu bairro.
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        {visitantesDoMeuBairro.slice(0, 4).map((vis) => (
+                          <div
+                            key={vis.id}
+                            className="p-3.5 rounded-xl bg-[#FAFAFA] border border-[#E4E4E7] space-y-2"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-xs text-[#0A0A0A]">{vis.nome}</span>
+                              <span className="text-[10px] font-semibold text-[#71717A]">
+                                {vis.bairro || 'Sem bairro'}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-[#52525B]">
+                              {vis.pedido_oracao ? `Oração: ${vis.pedido_oracao.slice(0, 45)}...` : 'Acolhido na Conexão'}
+                            </p>
+                            {vis.telefone && (
+                              <a
+                                href={`https://wa.me/55${vis.telefone.replace(/\D/g, '')}?text=${encodeURIComponent(
+                                  `Graça e paz, ${vis.nome}! Sou o líder da Célula da Eira Church aqui no bairro ${celulaDoLider?.bairro || 'perto de você'}. Foi uma alegria ter você no culto! Gostaria de te convidar para o nosso encontro!`
+                                )}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="w-full py-1.5 px-2 rounded-md bg-[#DCFCE7] text-[#166534] border border-[#BBF7D0] hover:bg-[#BBF7D0] text-[11px] font-bold flex items-center justify-center space-x-1 transition-colors"
+                              >
+                                <span>Convidar no WhatsApp</span>
+                              </a>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Eventos Oficiais e em Destaque para Divulgar na Célula */}
+                  <div className="p-5 rounded-[var(--radius-box,0.75rem)] bg-white border border-[#E4E4E7] shadow-sm space-y-4">
+                    <div className="border-b border-[#F4F4F5] pb-3">
+                      <h4 className="font-extrabold text-sm text-[#0A0A0A]">
+                        Eventos Oficiais da Igreja (Divulgação na Célula)
+                      </h4>
+                      <p className="text-xs text-[#71717A]">
+                        Compartilhe os links de inscrição diretamente no grupo da sua célula no WhatsApp.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {eventos.map((ev) => (
+                        <div
+                          key={ev.id}
+                          className="rounded-xl border border-[#E4E4E7] overflow-hidden bg-white flex flex-col justify-between shadow-2xs hover:shadow-sm transition-all"
+                        >
+                          <div className="relative aspect-video bg-[#0A0A0A]">
+                            {ev.imagem_url ? (
+                              <img
+                                src={ev.imagem_url}
+                                alt={ev.nome}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-[var(--accent,#FACC15)] font-bold text-xs">
+                                {ev.nome}
+                              </div>
+                            )}
+                            <div className="absolute top-2 left-2 flex gap-1">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-black text-[var(--accent,#FACC15)] shadow-xs">
+                                {ev.rede}
+                              </span>
+                            </div>
+                            <div className="absolute bottom-2 right-2">
+                              <span className="px-2 py-0.5 rounded text-xs font-black bg-black/90 text-white shadow-xs">
+                                {formatarMoeda(ev.valor)}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
+                            <div className="space-y-1">
+                              <h5 className="font-extrabold text-sm text-[#0A0A0A] line-clamp-1">
+                                {ev.nome}
+                              </h5>
+                              <p className="text-xs text-[#71717A]">
+                                📅 {formatarDataCurta(ev.data_inicio)} • 👥 {ev.vagas} vagas
+                              </p>
+                              {ev.local_nome && (
+                                <p className="text-[11px] text-[#71717A] truncate">
+                                  📍 {ev.local_nome}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="pt-2 border-t border-[#F4F4F5] flex flex-col gap-2">
+                              <a
+                                href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                                  `Fala galera da célula! As inscrições para o evento *${ev.nome}* da Eira Church estão abertas! Garanta sua vaga pelo link oficial: ${
+                                    typeof window !== 'undefined' ? window.location.origin : ''
+                                  }/evento/${ev.slug}`
+                                )}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="w-full py-2 px-3 rounded-lg text-xs font-bold bg-[#DCFCE7] text-[#166534] border border-[#BBF7D0] hover:bg-[#BBF7D0] transition-colors flex items-center justify-center space-x-1.5"
+                              >
+                                <Send className="w-3.5 h-3.5" />
+                                <span>Compartilhar no Grupo da Célula</span>
+                              </a>
+
+                              <div className="flex items-center justify-between text-xs font-bold">
+                                <button
+                                  type="button"
+                                  onClick={() => copiarLinkEvento(ev.slug)}
+                                  className="text-black hover:underline flex items-center cursor-pointer"
+                                >
+                                  <Copy className="w-3 h-3 mr-1" />
+                                  Copiar Link
+                                </button>
+                                <Link
+                                  href={`/evento/${ev.slug}`}
+                                  target="_blank"
+                                  className="text-[#71717A] hover:text-black flex items-center"
+                                >
+                                  <span>Ver Página</span>
+                                  <ExternalLink className="w-3 h-3 ml-1" />
+                                </Link>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
               ) : (
-                /* SE PASTOR OU ADMINISTRADOR: Dashboard Completo com Filtro Temporal Mês a Mês e Ano */
+                /* SE LÍDER DE 12, PASTOR OU ADMINISTRADOR: Dashboard Completo com Filtro Temporal Mês a Mês e Ano */
                 <div className="space-y-8">
                   {/* Seletor Temporal de Frequência & Membresia */}
                   <div className="p-5 rounded-[var(--radius-box,0.75rem)] bg-white border border-[#E4E4E7] shadow-sm space-y-4 text-left">
@@ -813,154 +1229,156 @@ export default function AdminPage() {
                       />
                     </div>
                   </div>
-                </div>
-              )}
 
-              {/* Métricas dos Módulos Conexão e Células */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div
-                  onClick={() => setAbaAtiva('conexao')}
-                  className="p-5 rounded-[var(--radius-box,0.75rem)] bg-white border border-[#E4E4E7] flex items-center justify-between shadow-sm cursor-pointer hover:border-black transition-colors"
-                >
-                  <div className="space-y-1 text-left">
-                    <span className="text-xs font-bold text-[#71717A] uppercase">
-                      Visitantes // Conexão
-                    </span>
-                    <p className="text-2xl font-black text-[#0A0A0A]">
-                      {visitantes.length} pessoas acolhidas
-                    </p>
-                    <p className="text-xs text-[#52525B] flex items-center">
-                      <span>Acessar acolhimento e contatos</span>
-                      <ArrowRight className="w-3.5 h-3.5 ml-1" />
-                    </p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-[#E0F2FE] text-[#075985]">
-                    <HeartHandshake className="w-6 h-6" />
-                  </div>
-                </div>
-
-                <div
-                  onClick={() => setAbaAtiva('celulas')}
-                  className="p-5 rounded-[var(--radius-box,0.75rem)] bg-white border border-[#E4E4E7] flex items-center justify-between shadow-sm cursor-pointer hover:border-black transition-colors"
-                >
-                  <div className="space-y-1 text-left">
-                    <span className="text-xs font-bold text-[#71717A] uppercase">
-                      Rede de Células
-                    </span>
-                    <p className="text-2xl font-black text-[#0A0A0A]">
-                      {celulas.length} células ativas
-                    </p>
-                    <p className="text-xs text-[#52525B] flex items-center">
-                      <span>Gerenciar integrantes e mapas</span>
-                      <ArrowRight className="w-3.5 h-3.5 ml-1" />
-                    </p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-[#DCFCE7] text-[#166534]">
-                    <Home className="w-6 h-6" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Lista Resumida de Eventos em Destaque */}
-              <div className="space-y-6 text-left">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-bold text-[#0A0A0A]">
-                      Eventos em Destaque & Links Rápidos
-                    </h3>
-                    <p className="text-xs text-[#71717A]">
-                      Copie o link direto ou acompanhe a ocupação de vagas:
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="dark"
-                    onClick={() => setAbaAtiva('novo-evento')}
-                  >
-                    <PlusCircle className="w-4 h-4 mr-1.5" />
-                    Criar Evento
-                  </Button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  {eventos.map((ev) => (
+                  {/* Métricas dos Módulos Conexão e Células */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div
-                      key={ev.id}
-                      className="rounded-[var(--radius-box,0.75rem)] bg-white border border-[#E4E4E7] overflow-hidden shadow-sm flex flex-col justify-between group hover:shadow-md hover:border-black/20 transition-all duration-200"
+                      onClick={() => setAbaAtiva('conexao')}
+                      className="p-5 rounded-[var(--radius-box,0.75rem)] bg-white border border-[#E4E4E7] flex items-center justify-between shadow-sm cursor-pointer hover:border-black transition-colors"
                     >
-                      {/* Banner do Evento 16:9 */}
-                      <div className="relative w-full aspect-video bg-[#0A0A0A] overflow-hidden">
-                        {ev.imagem_url ? (
-                          <img
-                            src={ev.imagem_url}
-                            alt={`Banner de ${ev.nome}`}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center bg-[#18181B] text-[var(--accent,#FACC15)] p-4 text-center">
-                            <span className="font-black text-sm tracking-tight">EIRA CHURCH</span>
-                            <span className="text-[10px] font-bold text-[#A1A1AA] uppercase mt-1">
-                              REDE {ev.rede.toUpperCase()}
-                            </span>
-                          </div>
-                        )}
-                        {/* Badges Flutuantes sobre o Banner */}
-                        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-10">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-black text-[var(--accent,#FACC15)] shadow-sm">
-                            {ev.rede}
-                          </span>
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-white/90 text-[#0A0A0A] shadow-sm backdrop-blur-xs">
-                            {ev.categoria}
-                          </span>
-                        </div>
-                        <div className="absolute bottom-2.5 right-2.5 z-10">
-                          <span className="px-2.5 py-0.5 rounded text-xs font-black bg-black/90 text-white border border-white/20 shadow-sm tabular-nums backdrop-blur-xs">
-                            {formatarMoeda(ev.valor)}
-                          </span>
-                        </div>
+                      <div className="space-y-1 text-left">
+                        <span className="text-xs font-bold text-[#71717A] uppercase">
+                          Visitantes // Conexão
+                        </span>
+                        <p className="text-2xl font-black text-[#0A0A0A]">
+                          {visitantes.length} pessoas acolhidas
+                        </p>
+                        <p className="text-xs text-[#52525B] flex items-center">
+                          <span>Acessar acolhimento e contatos</span>
+                          <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                        </p>
                       </div>
-
-                      {/* Informações e Ações */}
-                      <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
-                        <div className="space-y-1.5">
-                          <h4 className="font-extrabold text-sm text-[#0A0A0A] line-clamp-1 group-hover:text-[var(--accent-hover,#CA8A04)] transition-colors">
-                            {ev.nome}
-                          </h4>
-                          <p className="text-xs text-[#71717A] flex items-center gap-1">
-                            <span>📅 {formatarDataCurta(ev.data_inicio)}</span>
-                            <span>•</span>
-                            <span>👥 {ev.vagas} vagas</span>
-                          </p>
-                          {ev.local_nome && (
-                            <p className="text-[11px] text-[#71717A] truncate">
-                              📍 {ev.local_nome}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="pt-3 border-t border-[#F4F4F5] flex items-center justify-between">
-                          <button
-                            type="button"
-                            onClick={() => copiarLinkEvento(ev.slug)}
-                            className="text-xs font-bold text-black flex items-center hover:text-[var(--accent-hover,#CA8A04)] transition-colors cursor-pointer"
-                          >
-                            <Copy className="w-3.5 h-3.5 mr-1" />
-                            Copiar Link
-                          </button>
-                          <Link
-                            href={`/evento/${ev.slug}`}
-                            target="_blank"
-                            className="text-xs font-bold text-[#71717A] hover:text-black flex items-center transition-colors"
-                          >
-                            <span>Abrir Página</span>
-                            <ExternalLink className="w-3 h-3 ml-1" />
-                          </Link>
-                        </div>
+                      <div className="p-3 rounded-lg bg-[#E0F2FE] text-[#075985]">
+                        <HeartHandshake className="w-6 h-6" />
                       </div>
                     </div>
-                  ))}
+
+                    <div
+                      onClick={() => setAbaAtiva('celulas')}
+                      className="p-5 rounded-[var(--radius-box,0.75rem)] bg-white border border-[#E4E4E7] flex items-center justify-between shadow-sm cursor-pointer hover:border-black transition-colors"
+                    >
+                      <div className="space-y-1 text-left">
+                        <span className="text-xs font-bold text-[#71717A] uppercase">
+                          Rede de Células
+                        </span>
+                        <p className="text-2xl font-black text-[#0A0A0A]">
+                          {celulas.length} células ativas
+                        </p>
+                        <p className="text-xs text-[#52525B] flex items-center">
+                          <span>Gerenciar integrantes e mapas</span>
+                          <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                        </p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-[#DCFCE7] text-[#166534]">
+                        <Home className="w-6 h-6" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Lista Resumida de Eventos em Destaque */}
+                  <div className="space-y-6 text-left">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-bold text-[#0A0A0A]">
+                          Eventos em Destaque & Links Rápidos
+                        </h3>
+                        <p className="text-xs text-[#71717A]">
+                          Copie o link direto ou acompanhe a ocupação de vagas:
+                        </p>
+                      </div>
+                      {isDiretoria && (
+                        <Button
+                          size="sm"
+                          variant="dark"
+                          onClick={() => setAbaAtiva('novo-evento')}
+                        >
+                          <PlusCircle className="w-4 h-4 mr-1.5" />
+                          Criar Evento
+                        </Button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                      {eventos.map((ev) => (
+                        <div
+                          key={ev.id}
+                          className="rounded-[var(--radius-box,0.75rem)] bg-white border border-[#E4E4E7] overflow-hidden shadow-sm flex flex-col justify-between group hover:shadow-md hover:border-black/20 transition-all duration-200"
+                        >
+                          {/* Banner do Evento 16:9 */}
+                          <div className="relative w-full aspect-video bg-[#0A0A0A] overflow-hidden">
+                            {ev.imagem_url ? (
+                              <img
+                                src={ev.imagem_url}
+                                alt={`Banner de ${ev.nome}`}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex flex-col items-center justify-center bg-[#18181B] text-[var(--accent,#FACC15)] p-4 text-center">
+                                <span className="font-black text-sm tracking-tight">EIRA CHURCH</span>
+                                <span className="text-[10px] font-bold text-[#A1A1AA] uppercase mt-1">
+                                  REDE {ev.rede.toUpperCase()}
+                                </span>
+                              </div>
+                            )}
+                            {/* Badges Flutuantes sobre o Banner */}
+                            <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-10">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-black text-[var(--accent,#FACC15)] shadow-sm">
+                                {ev.rede}
+                              </span>
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-white/90 text-[#0A0A0A] shadow-sm backdrop-blur-xs">
+                                {ev.categoria}
+                              </span>
+                            </div>
+                            <div className="absolute bottom-2.5 right-2.5 z-10">
+                              <span className="px-2.5 py-0.5 rounded text-xs font-black bg-black/90 text-white border border-white/20 shadow-sm tabular-nums backdrop-blur-xs">
+                                {formatarMoeda(ev.valor)}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Informações e Ações */}
+                          <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
+                            <div className="space-y-1.5">
+                              <h4 className="font-extrabold text-sm text-[#0A0A0A] line-clamp-1 group-hover:text-[var(--accent-hover,#CA8A04)] transition-colors">
+                                {ev.nome}
+                              </h4>
+                              <p className="text-xs text-[#71717A] flex items-center gap-1">
+                                <span>📅 {formatarDataCurta(ev.data_inicio)}</span>
+                                <span>•</span>
+                                <span>👥 {ev.vagas} vagas</span>
+                              </p>
+                              {ev.local_nome && (
+                                <p className="text-[11px] text-[#71717A] truncate">
+                                  📍 {ev.local_nome}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="pt-3 border-t border-[#F4F4F5] flex items-center justify-between">
+                              <button
+                                type="button"
+                                onClick={() => copiarLinkEvento(ev.slug)}
+                                className="text-xs font-bold text-black flex items-center hover:text-[var(--accent-hover,#CA8A04)] transition-colors cursor-pointer"
+                              >
+                                <Copy className="w-3.5 h-3.5 mr-1" />
+                                Copiar Link
+                              </button>
+                              <Link
+                                href={`/evento/${ev.slug}`}
+                                target="_blank"
+                                className="text-xs font-bold text-[#71717A] hover:text-black flex items-center transition-colors"
+                              >
+                                <span>Abrir Página</span>
+                                <ExternalLink className="w-3 h-3 ml-1" />
+                              </Link>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
 

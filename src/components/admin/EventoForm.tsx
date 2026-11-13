@@ -55,15 +55,45 @@ export const EventoForm: React.FC<EventoFormProps> = ({
   const handleUploadBanner = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      erro('A imagem do evento deve ter no máximo 5MB.');
+    if (file.size > 8 * 1024 * 1024) {
+      erro('A imagem do evento deve ter no máximo 8MB.');
       return;
     }
+
     const reader = new FileReader();
     reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      setImagemUrl(dataUrl);
-      sucesso('Upload da imagem do evento realizado com sucesso!');
+      const rawDataUrl = event.target?.result as string;
+      if (typeof window !== 'undefined') {
+        const img = new window.Image();
+        img.src = rawDataUrl;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxWidth = 1400;
+          let width = img.width;
+          let height = img.height;
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const optimized = canvas.toDataURL('image/jpeg', 0.82);
+            setImagemUrl(optimized);
+          } else {
+            setImagemUrl(rawDataUrl);
+          }
+          sucesso('Banner do evento carregado e otimizado com sucesso!');
+        };
+        img.onerror = () => {
+          setImagemUrl(rawDataUrl);
+          sucesso('Upload realizado com sucesso!');
+        };
+      } else {
+        setImagemUrl(rawDataUrl);
+      }
     };
     reader.readAsDataURL(file);
   };

@@ -162,33 +162,41 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
     { id: 'monochrome', nome: 'Monochrome', cor: '#18181B' },
   ];
 
-  // Abas disponíveis para líderes
-  const abasBase = [
-    { id: 'dashboard' as AbaAdmin, label: 'Painel Geral', icon: Church },
-    { id: 'conexao' as AbaAdmin, label: 'Conexão // Visitantes', icon: HeartHandshake },
-    { id: 'celulas' as AbaAdmin, label: 'Rede de Células', icon: Home },
-    {
-      id: 'inscricoes' as AbaAdmin,
-      label: usuarioRole === 'lider' ? 'Inscrições' : 'Inscrições & Finanças',
-      icon: Users,
-    },
-    { id: 'eventos' as AbaAdmin, label: 'Gerenciar Eventos', icon: Calendar },
-    { id: 'novo-evento' as AbaAdmin, label: '+ Novo Evento', icon: PlusCircle },
-  ];
+  const isLiderCelula = usuarioRole === 'lider_celula' || usuarioRole === 'lider';
+  const isLider12 = usuarioRole === 'lider_12';
+  const isDiretoria = usuarioRole === 'pastor' || usuarioRole === 'admin';
 
-  // Aba exclusiva para Pastor e Administrador
-  const abasExtras =
-    usuarioRole === 'pastor' || usuarioRole === 'admin'
-      ? [
-          {
-            id: 'configuracao' as AbaAdmin,
-            label: 'Configuração da Igreja',
-            icon: Settings,
-          },
-        ]
-      : [];
+  // Configuração estrita de abas por perfil
+  const todasAbas = useMemo(() => {
+    if (isLiderCelula) {
+      return [
+        { id: 'dashboard' as AbaAdmin, label: 'Painel da Célula', icon: Church },
+        { id: 'celulas' as AbaAdmin, label: 'Minha Célula', icon: Home },
+        { id: 'conexao' as AbaAdmin, label: 'Pessoas do Meu Bairro', icon: HeartHandshake },
+      ];
+    }
 
-  const todasAbas = [...abasBase, ...abasExtras];
+    if (isLider12) {
+      return [
+        { id: 'dashboard' as AbaAdmin, label: 'Painel da Rede de 12', icon: Church },
+        { id: 'conexao' as AbaAdmin, label: 'Conexão // Visitantes', icon: HeartHandshake },
+        { id: 'celulas' as AbaAdmin, label: 'Rede de Células', icon: Home },
+        { id: 'inscricoes' as AbaAdmin, label: 'Inscrições', icon: Users },
+        { id: 'eventos' as AbaAdmin, label: 'Eventos Oficiais', icon: Calendar },
+      ];
+    }
+
+    // Diretoria (Pastor & Admin)
+    return [
+      { id: 'dashboard' as AbaAdmin, label: 'Painel Geral', icon: Church },
+      { id: 'conexao' as AbaAdmin, label: 'Conexão // Visitantes', icon: HeartHandshake },
+      { id: 'celulas' as AbaAdmin, label: 'Rede de Células', icon: Home },
+      { id: 'inscricoes' as AbaAdmin, label: 'Inscrições & Finanças', icon: Users },
+      { id: 'eventos' as AbaAdmin, label: 'Gerenciar Eventos', icon: Calendar },
+      { id: 'novo-evento' as AbaAdmin, label: '+ Novo Evento', icon: PlusCircle },
+      { id: 'configuracao' as AbaAdmin, label: 'Configuração da Igreja', icon: Settings },
+    ];
+  }, [isLiderCelula, isLider12, isDiretoria]);
 
   return (
     <header className="w-full bg-white border-b border-[#E4E4E7] sticky top-0 z-40 transition-colors">
@@ -355,6 +363,8 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                 ? 'Perfil: Pastor'
                 : usuarioRole === 'admin'
                 ? 'Perfil: ADM'
+                : usuarioRole === 'lider_12'
+                ? 'Perfil: Líder de 12'
                 : 'Perfil: Líder de Célula'}
             </span>
           </div>

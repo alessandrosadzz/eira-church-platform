@@ -17,6 +17,9 @@ import {
   MapPin,
   Clock,
   Instagram,
+  Facebook,
+  Youtube,
+  Globe,
   Phone,
   MessageCircle,
   ExternalLink,
@@ -162,6 +165,23 @@ export default function HomePage() {
         ref={heroRef}
         className="w-full bg-[#0A0A0A] text-white pt-16 pb-20 px-4 sm:px-6 lg:px-8 relative overflow-hidden"
       >
+        {/* Banner institucional de fundo com arte nítida e contraste cinematográfico */}
+        {igrejaConfig.bannerUrl ? (
+          <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+            <img
+              src={igrejaConfig.bannerUrl}
+              alt="Banner Institucional"
+              aria-hidden="true"
+              className="w-full h-full object-cover scale-105 filter blur-[2px] brightness-[0.38] contrast-105"
+            />
+            {/* Gradients suaves para garantir máxima legibilidade do texto branco */}
+            <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/75 to-[#0A0A0A]" />
+            <div className="absolute inset-0 bg-radial from-transparent via-black/30 to-black/80" />
+          </div>
+        ) : (
+          <div className="absolute inset-0 bg-radial from-[var(--accent,#FACC15)]/10 via-transparent to-transparent pointer-events-none" />
+        )}
+
         <div className="max-w-4xl mx-auto text-center space-y-4 relative z-10">
           <div className="inline-flex items-center px-3.5 py-1 rounded-full text-xs font-black bg-[var(--accent,#FACC15)] text-[var(--accent-text,#000000)] tracking-tight mb-2">
             CALENDÁRIO OFICIAL // {igrejaConfig.nome.toUpperCase()}
@@ -175,9 +195,6 @@ export default function HomePage() {
             {igrejaConfig.slogan}. Garanta sua vaga nos momentos mais transformadores da nossa congregação com confirmação instantânea.
           </p>
         </div>
-
-        {/* Gradiente sutil de fundo com a cor do tema */}
-        <div className="absolute inset-0 bg-radial from-[var(--accent,#FACC15)]/10 via-transparent to-transparent pointer-events-none" />
       </section>
 
       {/* ==================================================== */}
@@ -363,14 +380,52 @@ export default function HomePage() {
 
               <div className="space-y-2 pt-2 border-t border-[#27272A] text-xs">
                 {igrejaConfig.instagram && (
-                  <div className="flex items-center space-x-2 text-[#A1A1AA]">
-                    <Instagram className="w-4 h-4 text-[var(--accent,#FACC15)]" />
+                  <a
+                    href={`https://instagram.com/${igrejaConfig.instagram.replace('@', '').trim()}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center space-x-2 text-[#A1A1AA] hover:text-white transition-colors"
+                  >
+                    <Instagram className="w-4 h-4 text-[var(--accent,#FACC15)] shrink-0" />
                     <span>{igrejaConfig.instagram}</span>
-                  </div>
+                  </a>
+                )}
+                {igrejaConfig.facebook && (
+                  <a
+                    href={igrejaConfig.facebook.startsWith('http') ? igrejaConfig.facebook : `https://${igrejaConfig.facebook}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center space-x-2 text-[#A1A1AA] hover:text-white transition-colors"
+                  >
+                    <Facebook className="w-4 h-4 text-[var(--accent,#FACC15)] shrink-0" />
+                    <span>Facebook Oficial</span>
+                  </a>
+                )}
+                {igrejaConfig.youtube && (
+                  <a
+                    href={igrejaConfig.youtube.startsWith('http') ? igrejaConfig.youtube : `https://${igrejaConfig.youtube}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center space-x-2 text-[#A1A1AA] hover:text-white transition-colors"
+                  >
+                    <Youtube className="w-4 h-4 text-[var(--accent,#FACC15)] shrink-0" />
+                    <span>Canal no YouTube</span>
+                  </a>
+                )}
+                {igrejaConfig.site && (
+                  <a
+                    href={igrejaConfig.site.startsWith('http') ? igrejaConfig.site : `https://${igrejaConfig.site}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center space-x-2 text-[#A1A1AA] hover:text-white transition-colors"
+                  >
+                    <Globe className="w-4 h-4 text-[var(--accent,#FACC15)] shrink-0" />
+                    <span>Portal Oficial da Igreja</span>
+                  </a>
                 )}
                 {igrejaConfig.telefone && (
                   <div className="flex items-center space-x-2 text-[#A1A1AA]">
-                    <Phone className="w-4 h-4 text-[var(--accent,#FACC15)]" />
+                    <Phone className="w-4 h-4 text-[var(--accent,#FACC15)] shrink-0" />
                     <span>{igrejaConfig.telefone}</span>
                   </div>
                 )}
@@ -396,20 +451,71 @@ export default function HomePage() {
       {/* 6. RODAPÉ INSTITUCIONAL */}
       {/* ==================================================== */}
       <footer className="w-full bg-[#FAFAFA] border-t border-[#E4E4E7] py-8 px-4 sm:px-6">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#71717A]">
-          <div className="flex items-center space-x-2">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 text-xs text-[#71717A]">
+          <div className="flex flex-col sm:flex-row items-center space-y-1 sm:space-y-0 sm:space-x-2 text-center sm:text-left">
             <span className="font-extrabold text-[#0A0A0A]">{igrejaConfig.nome}</span>
-            <span>•</span>
+            <span className="hidden sm:inline">•</span>
             <span>{igrejaConfig.slogan}</span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-4">
+          {/* Redes Sociais Clicáveis */}
+          <div className="flex flex-wrap items-center justify-center gap-2.5">
+            {igrejaConfig.instagram && (
+              <a
+                href={`https://instagram.com/${igrejaConfig.instagram.replace('@', '').trim()}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#E4E4E7] text-[#0A0A0A] hover:border-black hover:bg-[#F4F4F5] transition-all font-bold shadow-2xs"
+                title="Instagram Oficial"
+              >
+                <Instagram className="w-3.5 h-3.5 text-pink-600" />
+                <span>{igrejaConfig.instagram}</span>
+              </a>
+            )}
+
+            {igrejaConfig.facebook && (
+              <a
+                href={igrejaConfig.facebook.startsWith('http') ? igrejaConfig.facebook : `https://${igrejaConfig.facebook}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#E4E4E7] text-[#0A0A0A] hover:border-black hover:bg-[#F4F4F5] transition-all font-bold shadow-2xs"
+                title="Facebook Oficial"
+              >
+                <Facebook className="w-3.5 h-3.5 text-blue-600" />
+                <span>Facebook</span>
+              </a>
+            )}
+
+            {igrejaConfig.youtube && (
+              <a
+                href={igrejaConfig.youtube.startsWith('http') ? igrejaConfig.youtube : `https://${igrejaConfig.youtube}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#E4E4E7] text-[#0A0A0A] hover:border-black hover:bg-[#F4F4F5] transition-all font-bold shadow-2xs"
+                title="YouTube Oficial"
+              >
+                <Youtube className="w-3.5 h-3.5 text-red-600" />
+                <span>YouTube</span>
+              </a>
+            )}
+
+            {igrejaConfig.site && (
+              <a
+                href={igrejaConfig.site.startsWith('http') ? igrejaConfig.site : `https://${igrejaConfig.site}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-white border border-[#E4E4E7] text-[#0A0A0A] hover:border-black hover:bg-[#F4F4F5] transition-all font-bold shadow-2xs"
+                title="Site Oficial da Igreja"
+              >
+                <Globe className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Site Oficial</span>
+              </a>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-3">
             <Link href="/boas-vindas" className="hover:text-black transition-colors font-medium">
               Ficha do Visitante
-            </Link>
-            <span>•</span>
-            <Link href="/cadastro-lider" className="hover:text-black transition-colors font-medium">
-              Cadastro de Líder de Célula
             </Link>
             <span>•</span>
             <Link

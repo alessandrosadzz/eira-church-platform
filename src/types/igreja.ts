@@ -19,7 +19,7 @@ export type FonteOpcao =
 
 export type ModoCor = 'light' | 'dark';
 
-export type UsuarioRole = 'lider' | 'pastor' | 'admin';
+export type UsuarioRole = 'admin' | 'pastor' | 'lider_12' | 'lider_celula' | 'lider';
 
 export interface HorarioCulto {
   id: string;
@@ -45,6 +45,9 @@ export interface IgrejaConfig {
   telefone: string;
   whatsapp: string;
   instagram: string;
+  facebook?: string;
+  youtube?: string;
+  site?: string;
   email: string;
   chavePix?: string;
   copiaEColaPix?: string;
@@ -107,5 +110,6 @@ export interface LiderConta {
   telefone: string;
   celulaNome: string;
   rede: string;
+  role?: UsuarioRole;
   criadoEm: string;
 }

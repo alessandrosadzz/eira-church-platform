@@ -19,16 +19,22 @@ export const EventHero: React.FC<{ evento: Evento }> = ({ evento }) => {
 
   return (
     <section className="relative w-full bg-[#0A0A0A] text-white pt-16 pb-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
-      {/* Imagem de Fundo com Overlay Cinematografico */}
-      {evento.imagem_url && (
-        <div className="absolute inset-0 z-0 opacity-25">
+      {/* Imagem de Fundo com Arte do Banner e Contraste Otimizado */}
+      {evento.imagem_url ? (
+        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
           <img
             src={evento.imagem_url}
-            alt=""
+            alt={`Arte do evento ${evento.nome}`}
             aria-hidden="true"
-            className="w-full h-full object-cover blur-sm"
+            className="w-full h-full object-cover scale-105 filter blur-[2px] brightness-[0.42] contrast-105"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A]/80 via-[#0A0A0A]/95 to-[#0A0A0A]" />
+          {/* Gradients para transição suave e contraste legível das letras brancas */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/75 to-[#0A0A0A]" />
+          <div className="absolute inset-0 bg-radial from-transparent via-black/30 to-black/80" />
+        </div>
+      ) : (
+        <div className="absolute inset-0 z-0 bg-gradient-to-b from-[#18181B] via-[#0A0A0A] to-[#0A0A0A] opacity-90">
+          <div className="absolute inset-0 bg-radial from-[var(--accent,#FACC15)]/15 via-transparent to-transparent pointer-events-none" />
         </div>
       )}
 

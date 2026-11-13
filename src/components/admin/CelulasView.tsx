@@ -26,6 +26,9 @@ import {
   Share2,
   Pencil,
   RefreshCw,
+  Crown,
+  Send,
+  X,
 } from 'lucide-react';
 import {
   salvarCelulaSupabase,
@@ -46,8 +49,15 @@ export const CelulasView: React.FC = () => {
     removerMembroCelula,
     toggleBatismoMembro,
     usuarioRole,
+    usuarioNomeLogado,
   } = useAdminStore();
 
+  const isLiderCelula = usuarioRole === 'lider_celula' || usuarioRole === 'lider';
+  const isLider12 = usuarioRole === 'lider_12';
+  const isDiretoria = usuarioRole === 'pastor' || usuarioRole === 'admin';
+  const podeGerarConvites = isLider12 || isDiretoria;
+
+  const [modalConvitesAberto, setModalConvitesAberto] = useState(false);
   const [carregandoCelulas, setCarregandoCelulas] = useState(false);
 
   const [busca, setBusca] = useState('');
@@ -152,7 +162,25 @@ export const CelulasView: React.FC = () => {
 
   // Lista Filtrada
   const celulasFiltradas = useMemo(() => {
-    return celulas.filter((c) => {
+    let lista = celulas;
+
+    // Se for líder de célula comum, restringe a visão exclusivamente à sua própria célula
+    if (isLiderCelula) {
+      const nomeNorm = (usuarioNomeLogado || '').toLowerCase().trim();
+      const celPropria = celulas.filter((c) => {
+        if (c.lider_nome && c.lider_nome.toLowerCase().trim().includes(nomeNorm)) return true;
+        if (c.anfitriao_nome && c.anfitriao_nome.startsWith('{')) {
+          try {
+            const meta = JSON.parse(c.anfitriao_nome);
+            if (meta.usuario && meta.usuario.toLowerCase().trim() === nomeNorm) return true;
+          } catch {}
+        }
+        return false;
+      });
+      lista = celPropria.length > 0 ? celPropria : celulas.slice(0, 1);
+    }
+
+    return lista.filter((c) => {
       const matchBusca =
         !busca.trim() ||
         c.nome.toLowerCase().includes(busca.toLowerCase()) ||
@@ -163,7 +191,7 @@ export const CelulasView: React.FC = () => {
 
       return matchBusca && matchRede;
     });
-  }, [celulas, busca, redeFiltro]);
+  }, [celulas, isLiderCelula, usuarioNomeLogado, busca, redeFiltro]);
 
   // Copiar link para líderes
   const handleCopiarLinkLideres = () => {
@@ -321,26 +349,31 @@ export const CelulasView: React.FC = () => {
             <span>Atualizar</span>
           </Button>
 
-          <Button
-            variant="secondary"
-            size="md"
-            onClick={handleCopiarLinkLideres}
-            title="Copiar link para enviar aos líderes"
-            className="flex-1 sm:flex-initial"
-          >
-            <Share2 className="w-4 h-4 mr-2" />
-            <span>Link para Líderes</span>
-          </Button>
+          {/* Somente Líderes de 12 e Pastores podem criar convites para novos líderes */}
+          {podeGerarConvites && (
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={() => setModalConvitesAberto(true)}
+              title="Gerar convite para novo líder de célula ou líder de 12"
+              className="flex-1 sm:flex-initial"
+            >
+              <Crown className="w-4 h-4 mr-2 text-amber-600" />
+              <span>Convidar Líderes</span>
+            </Button>
+          )}
 
-          <Button
-            variant="primary"
-            size="md"
-            onClick={() => setModalNovaCelula(true)}
-            className="flex-1 sm:flex-initial shadow-md"
-          >
-            <PlusCircle className="w-4 h-4 mr-2" />
-            <span>Cadastrar Célula</span>
-          </Button>
+          {(!isLiderCelula || celulasFiltradas.length === 0) && (
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => setModalNovaCelula(true)}
+              className="flex-1 sm:flex-initial shadow-md"
+            >
+              <PlusCircle className="w-4 h-4 mr-2" />
+              <span>{isLiderCelula ? 'Cadastrar Minha Célula' : 'Cadastrar Célula'}</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -988,6 +1021,138 @@ export const CelulasView: React.FC = () => {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: GERADOR DE CONVITES PARA LIDERANÇA (EXCLUSIVO LÍDERES DE 12 E PASTORES) */}
+      {modalConvitesAberto && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white rounded-[var(--radius-box,0.75rem)] border border-[#E4E4E7] shadow-xl overflow-hidden animate-fadeIn text-left">
+            <div className="p-5 border-b border-[#F4F4F5] flex items-center justify-between bg-[#FAFAFA]">
+              <div className="flex items-center space-x-2">
+                <span className="p-1.5 rounded-lg bg-[var(--accent,#FACC15)] text-[var(--accent-text,#000000)]">
+                  <Crown className="w-4 h-4" />
+                </span>
+                <div>
+                  <h3 className="font-extrabold text-sm text-[#0A0A0A]">
+                    Gerar Convites de Liderança
+                  </h3>
+                  <p className="text-[11px] text-[#71717A]">
+                    Somente Líderes de 12 e Pastores possuem permissão para convidar novos líderes.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalConvitesAberto(false)}
+                className="text-[#71717A] hover:text-[#0A0A0A] p-1 rounded cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Opção 1: Convite para Líder de Célula */}
+              <div className="p-4 rounded-xl bg-[#FAFAFA] border border-[#E4E4E7] space-y-3">
+                <div className="space-y-0.5">
+                  <div className="flex items-center space-x-1.5">
+                    <Users className="w-4 h-4 text-emerald-600" />
+                    <h4 className="font-extrabold text-xs text-[#0A0A0A]">
+                      Convite para Novo Líder de Célula
+                    </h4>
+                  </div>
+                  <p className="text-[11px] text-[#71717A]">
+                    O líder recebe o link para registrar sua célula local, membros e batismos.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+                      const url = `${origin}/cadastro-lider?tipo=lider_celula&por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`;
+                      navigator.clipboard.writeText(url);
+                      sucesso('Link de convite para Líder de Célula copiado!');
+                    }}
+                    className="flex-1 py-2 px-3 rounded-lg text-xs font-bold bg-black text-[var(--accent,#FACC15)] hover:bg-[#27272A] transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Copiar Link de Célula</span>
+                  </button>
+
+                  <a
+                    href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                      `Graça e paz! Segue o link oficial para você cadastrar a sua célula e ativar seu login de Líder na Eira Church: ${
+                        typeof window !== 'undefined' ? window.location.origin : ''
+                      }/cadastro-lider?tipo=lider_celula&por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`
+                    )}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="p-2 rounded-lg bg-[#22C55E] text-white hover:bg-[#16A34A] transition-colors flex items-center justify-center"
+                    title="Enviar no WhatsApp"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
+
+              {/* Opção 2: Convite para Líder de 12 */}
+              <div className="p-4 rounded-xl bg-[#FAFAFA] border border-[#E4E4E7] space-y-3">
+                <div className="space-y-0.5">
+                  <div className="flex items-center space-x-1.5">
+                    <Crown className="w-4 h-4 text-amber-600" />
+                    <h4 className="font-extrabold text-xs text-[#0A0A0A]">
+                      Convite para Novo Líder de 12 (Discipulador)
+                    </h4>
+                  </div>
+                  <p className="text-[11px] text-[#71717A]">
+                    O líder recebe acesso amplo à rede de células e autorização para gerar novos convites.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+                      const url = `${origin}/cadastro-lider?tipo=lider_12&por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`;
+                      navigator.clipboard.writeText(url);
+                      sucesso('Link de convite para Líder de 12 copiado!');
+                    }}
+                    className="flex-1 py-2 px-3 rounded-lg text-xs font-bold bg-[#F4F4F5] text-black border border-[#E4E4E7] hover:border-black transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Copiar Link dos 12</span>
+                  </button>
+
+                  <a
+                    href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                      `Graça e paz! Segue o link oficial para você cadastrar seu acesso como Líder de 12 na Eira Church: ${
+                        typeof window !== 'undefined' ? window.location.origin : ''
+                      }/cadastro-lider?tipo=lider_12&por=${encodeURIComponent(usuarioNomeLogado || 'Liderança dos 12')}`
+                    )}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="p-2 rounded-lg bg-[#22C55E] text-white hover:bg-[#16A34A] transition-colors flex items-center justify-center"
+                    title="Enviar no WhatsApp"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-[#FAFAFA] border-t border-[#E4E4E7] flex justify-end">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setModalConvitesAberto(false)}
+              >
+                Fechar
+              </Button>
+            </div>
           </div>
         </div>
       )}

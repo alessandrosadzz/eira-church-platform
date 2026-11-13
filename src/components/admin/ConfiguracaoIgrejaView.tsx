@@ -291,6 +291,9 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
   const [telefone, setTelefone] = useState(igrejaConfig.telefone);
   const [whatsapp, setWhatsapp] = useState(igrejaConfig.whatsapp);
   const [instagram, setInstagram] = useState(igrejaConfig.instagram);
+  const [facebook, setFacebook] = useState(igrejaConfig.facebook || '');
+  const [youtube, setYoutube] = useState(igrejaConfig.youtube || '');
+  const [site, setSite] = useState(igrejaConfig.site || '');
   const [email, setEmail] = useState(igrejaConfig.email);
 
   // Novo culto temporário
@@ -318,15 +321,44 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
   const handleUploadBanner = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      erro('O banner institucional deve ter no máximo 5MB.');
+    if (file.size > 8 * 1024 * 1024) {
+      erro('O banner institucional deve ter no máximo 8MB.');
       return;
     }
     const reader = new FileReader();
     reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      setBannerUrl(dataUrl);
-      sucesso('Upload do banner realizado com sucesso!');
+      const rawDataUrl = event.target?.result as string;
+      if (typeof window !== 'undefined') {
+        const img = new window.Image();
+        img.src = rawDataUrl;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxWidth = 1600;
+          let width = img.width;
+          let height = img.height;
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const optimized = canvas.toDataURL('image/jpeg', 0.82);
+            setBannerUrl(optimized);
+          } else {
+            setBannerUrl(rawDataUrl);
+          }
+          sucesso('Banner institucional carregado e otimizado com sucesso!');
+        };
+        img.onerror = () => {
+          setBannerUrl(rawDataUrl);
+          sucesso('Upload do banner realizado com sucesso!');
+        };
+      } else {
+        setBannerUrl(rawDataUrl);
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -422,6 +454,9 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
       telefone: telefone.trim(),
       whatsapp: whatsapp.trim(),
       instagram: instagram.trim(),
+      facebook: facebook.trim() || undefined,
+      youtube: youtube.trim() || undefined,
+      site: site.trim() || undefined,
       email: email.trim(),
     });
 
@@ -1062,18 +1097,19 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
             </div>
           </div>
 
-          {/* Banner: URL ou Upload */}
+          {/* Banner da Capa da Home: URL ou Upload */}
           <div className="space-y-1.5">
             <Input
-              label="URL do Banner Superior (16:9)"
+              label="Banner Principal da Home (Atrás do Título)"
               value={bannerUrl}
               onChange={(e) => setBannerUrl(e.target.value)}
-              placeholder="https://images.unsplash.com/..."
+              placeholder="https://sua-igreja.com/banner-home.jpg"
+              helperText="Exibido na capa inicial atrás de 'Próximos Encontros' com escurecimento automático."
             />
             <div className="flex items-center space-x-2 pt-1">
               <label className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[#F4F4F5] border border-[#E4E4E7] hover:border-black cursor-pointer transition-colors text-[#0A0A0A]">
                 <Upload className="w-3.5 h-3.5" />
-                <span>Fazer upload do Banner</span>
+                <span>Fazer upload do Banner da Home</span>
                 <input
                   type="file"
                   accept="image/png, image/jpeg, image/webp"
@@ -1361,15 +1397,42 @@ export const ConfiguracaoIgrejaView: React.FC = () => {
             label="Instagram Oficial"
             value={instagram}
             onChange={(e) => setInstagram(e.target.value)}
-            placeholder="@eirachurch"
+            placeholder="@daeirajoinville"
+            helperText="Aparece clicável no rodapé e contatos da página inicial."
           />
 
           <Input
-            label="E-mail de Contato"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="contato@eirachurch.com.br"
+            label="Facebook Oficial da Igreja"
+            value={facebook}
+            onChange={(e) => setFacebook(e.target.value)}
+            placeholder="https://facebook.com/eirachurch"
+            helperText="Link direto para a página do Facebook no rodapé."
           />
+
+          <Input
+            label="Canal do YouTube Oficial"
+            value={youtube}
+            onChange={(e) => setYoutube(e.target.value)}
+            placeholder="https://youtube.com/@eirachurch"
+            helperText="Link direto para os cultos e vídeos no YouTube."
+          />
+
+          <Input
+            label="Website / Portal Oficial"
+            value={site}
+            onChange={(e) => setSite(e.target.value)}
+            placeholder="https://eirachurch.com.br"
+            helperText="Link para o site institucional."
+          />
+
+          <div className="md:col-span-2">
+            <Input
+              label="E-mail de Contato Geral"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="contato@eirachurch.com.br"
+            />
+          </div>
         </div>
       </div>
 

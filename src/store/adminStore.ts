@@ -66,7 +66,10 @@ const IGREJA_CONFIG_PADRAO: IgrejaConfig = {
   cultos: [],
   telefone: '',
   whatsapp: '',
-  instagram: '',
+  instagram: '@daeirajoinville',
+  facebook: 'https://facebook.com/eirachurch',
+  youtube: 'https://youtube.com/@eirachurch',
+  site: 'https://eirachurch.com.br',
   email: '',
   chavePix: 'eirajoinville@hotmail.com',
   titularPix: 'Eira Church Joinville',
@@ -86,6 +89,8 @@ interface AdminStore {
   // Papel do Usuário Atual (Controle de Acesso)
   usuarioRole: UsuarioRole;
   setUsuarioRole: (role: UsuarioRole) => void;
+  usuarioNomeLogado: string;
+  setUsuarioNomeLogado: (nome: string) => void;
 
   // Autenticação & Contas de Líderes
   lideres: LiderConta[];
@@ -210,6 +215,16 @@ export const useAdminStore = create<AdminStore>((set) => ({
   usuarioRole: 'admin',
   setUsuarioRole: (role) => set({ usuarioRole: role }),
 
+  usuarioNomeLogado: obterPreferencia<string>('eira_usuario_nome', ''),
+  setUsuarioNomeLogado: (nome) => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('eira_usuario_nome', nome);
+      } catch {}
+    }
+    set({ usuarioNomeLogado: nome });
+  },
+
   lideres: obterListaArmazenada<LiderConta>('eira_lideres', []),
 
   cadastrarLider: (dados) =>
@@ -283,22 +298,35 @@ export const useAdminStore = create<AdminStore>((set) => ({
       return { valido: true, role: 'admin', nome: 'Administração Eira Church' };
     }
 
-    // 3. Líderes de Célula Cadastrados
+    // 3. Líderes de 12 (Discipuladores / Supervisores de Rede)
+    if ((u === 'lider12' || u === 'lideres12' || u === 'rede12' || u === 'discipulador') && s === 'eira@1212') {
+      return { valido: true, role: 'lider_12', nome: 'Liderança dos 12' };
+    }
+
+    // 4. Líderes de Célula e Líderes de 12 Cadastrados Localmente
     const state = useAdminStore.getState();
     const liderEncontrado = state.lideres.find(
       (l) => l.usuarioOuEmail.trim().toLowerCase() === u && l.senha === s
     );
     if (liderEncontrado) {
-      return { valido: true, role: 'lider', nome: liderEncontrado.nome };
+      return {
+        valido: true,
+        role: liderEncontrado.role || 'lider_celula',
+        nome: liderEncontrado.nome,
+      };
     }
 
-    // 4. Líderes cadastrados no Supabase (metadados na célula)
+    // 5. Líderes cadastrados no Supabase (metadados na célula)
     for (const cel of state.celulas) {
       if (cel.anfitriao_nome && cel.anfitriao_nome.startsWith('{')) {
         try {
           const meta = JSON.parse(cel.anfitriao_nome);
           if (meta.usuario && meta.usuario.trim().toLowerCase() === u && meta.senha === s) {
-            return { valido: true, role: 'lider', nome: cel.lider_nome };
+            return {
+              valido: true,
+              role: (meta.role as UsuarioRole) || 'lider_celula',
+              nome: cel.lider_nome,
+            };
           }
         } catch {}
       }

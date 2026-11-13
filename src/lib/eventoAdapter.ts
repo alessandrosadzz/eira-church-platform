@@ -73,6 +73,33 @@ export async function buscarEventosSupabase(): Promise<Evento[]> {
         const confirmados = contagemConfirmados[row.id] || 0;
         const vagasRestantes = Math.max(vagas - totalInscritos, 0);
 
+        let redeDoEvento: 'Hype' | 'One Way' | 'Padrão' = 'Padrão';
+        if (row.horario && typeof row.horario === 'string') {
+          if (row.horario.trim().startsWith('{')) {
+            try {
+              const metaH = JSON.parse(row.horario);
+              if (metaH.rede && ['Hype', 'One Way', 'Padrão'].includes(metaH.rede)) {
+                redeDoEvento = metaH.rede;
+              }
+            } catch {}
+          } else if (['Hype', 'One Way', 'Padrão'].includes(row.horario.trim())) {
+            redeDoEvento = row.horario.trim() as any;
+          }
+        }
+        if (redeDoEvento === 'Padrão' && typeof window !== 'undefined') {
+          try {
+            const mapaRedes = JSON.parse(localStorage.getItem('eira_eventos_rede_map') || '{}');
+            if (mapaRedes[row.id] || mapaRedes[row.slug]) {
+              redeDoEvento = mapaRedes[row.id] || mapaRedes[row.slug];
+            }
+          } catch {}
+        }
+        if (redeDoEvento === 'Padrão') {
+          const nomeL = (row.nome || '').toLowerCase();
+          if (nomeL.includes('hype') || nomeL.includes('marcados')) redeDoEvento = 'Hype';
+          else if (nomeL.includes('one way') || nomeL.includes('oneway')) redeDoEvento = 'One Way';
+        }
+
         return {
           id: row.id,
           nome: row.nome,
@@ -86,7 +113,7 @@ export async function buscarEventosSupabase(): Promise<Evento[]> {
           imagem_url: row.imagem_url || undefined,
           ativo: row.ativo !== false,
           categoria: (row.categoria as CategoriaEvento) || 'Outro',
-          rede: 'Padrão',
+          rede: redeDoEvento,
           campos: ['nome', 'telefone', 'email', 'nascimento'],
           total_inscritos: totalInscritos,
           inscritos_confirmados: totalInscritos,
@@ -123,6 +150,7 @@ export async function salvarEventoSupabase(evento: Partial<Evento>): Promise<Eve
       .replace(/(^-|-$)+/g, '') ||
     `evento-${Date.now()}`;
 
+  const redeEscolhida = evento.rede || 'Hype';
   const payloadDB = {
     id: idValido,
     nome: evento.nome?.trim() || 'Evento Eira Church',
@@ -131,6 +159,7 @@ export async function salvarEventoSupabase(evento: Partial<Evento>): Promise<Eve
     data_inicio: evento.data_inicio || new Date().toISOString(),
     data_fim: evento.data_fim || null,
     local: evento.local_nome?.trim() || 'Eira Church Joinville',
+    horario: JSON.stringify({ rede: redeEscolhida }),
     preco: Number(evento.valor || 0),
     limite_vagas: Number(evento.vagas || 100),
     imagem_url: evento.imagem_url?.trim() || null,
@@ -139,6 +168,15 @@ export async function salvarEventoSupabase(evento: Partial<Evento>): Promise<Eve
     destaque: true,
     updated_at: new Date().toISOString(),
   };
+
+  if (typeof window !== 'undefined') {
+    try {
+      const mapa = JSON.parse(localStorage.getItem('eira_eventos_rede_map') || '{}');
+      mapa[idValido] = redeEscolhida;
+      mapa[slugValido] = redeEscolhida;
+      localStorage.setItem('eira_eventos_rede_map', JSON.stringify(mapa));
+    } catch {}
+  }
 
   try {
     const { error } = await supabase.from('eventos').upsert(payloadDB);
@@ -555,12 +593,14 @@ export async function salvarCelulaSupabase(dados: {
   membros?: CelulaMembro[];
   usuarioAcesso?: string;
   senhaAcesso?: string;
+  role?: string;
 }): Promise<Celula> {
   const idValido = garantirUUID();
 
   const meta = {
     usuario: dados.usuarioAcesso || null,
     senha: dados.senhaAcesso || null,
+    role: dados.role || 'lider_celula',
     viceLider: dados.vice_lider_nome || null,
     anfitriao: dados.anfitriao_nome || null,
     mapsUrl: dados.maps_url || null,

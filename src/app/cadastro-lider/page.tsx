@@ -1,7 +1,7 @@
 // src/app/cadastro-lider/page.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAdminStore } from '../../store/adminStore';
 import { Input } from '../../components/ui/Input';
@@ -18,11 +18,16 @@ import {
   Users,
   ShieldCheck,
   LogIn,
+  Crown,
+  Sparkles,
 } from 'lucide-react';
 
 export default function CadastroLiderPage() {
   const { sucesso, erro } = useToast();
-  const { igrejaConfig, adicionarCelula, cadastrarLider } = useAdminStore();
+  const { igrejaConfig, cadastrarLider } = useAdminStore();
+
+  const [tipoLider, setTipoLider] = useState<'lider_celula' | 'lider_12'>('lider_celula');
+  const [convidadoPor, setConvidadoPor] = useState<string>('');
 
   const [nomeLider, setNomeLider] = useState('');
   const [telefoneLider, setTelefoneLider] = useState('');
@@ -41,6 +46,23 @@ export default function CadastroLiderPage() {
 
   const [cadastradoComSucesso, setCadastradoComSucesso] = useState(false);
   const [salvando, setSalvando] = useState(false);
+
+  // Lê parâmetros da URL gerados pelo Líder de 12
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const t = params.get('tipo');
+        if (t === 'lider_12') {
+          setTipoLider('lider_12');
+        } else {
+          setTipoLider('lider_celula');
+        }
+        const por = params.get('por');
+        if (por) setConvidadoPor(decodeURIComponent(por));
+      } catch {}
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +83,7 @@ export default function CadastroLiderPage() {
       erro('Defina uma senha com no mínimo 4 caracteres.');
       return;
     }
-    if (!nomeCelula.trim()) {
+    if (tipoLider === 'lider_celula' && !nomeCelula.trim()) {
       erro('Informe o nome da sua célula.');
       return;
     }
@@ -70,11 +92,17 @@ export default function CadastroLiderPage() {
       `${endereco || bairro}, Joinville - SC`
     )}`;
 
+    const nomeGrupoFinal =
+      nomeCelula.trim() ||
+      (tipoLider === 'lider_12'
+        ? `Rede de 12 // ${nomeLider.trim()}`
+        : `Célula ${nomeLider.trim()}`);
+
     setSalvando(true);
     try {
-      // 1. Salva a célula e credenciais diretamente no Supabase
+      // 1. Salva a célula e credenciais diretamente no Supabase com o papel correto
       await salvarCelulaSupabase({
-        nome: nomeCelula.trim(),
+        nome: nomeGrupoFinal,
         rede,
         lider_nome: nomeLider.trim(),
         lider_telefone: telefoneLider.trim(),
@@ -87,6 +115,7 @@ export default function CadastroLiderPage() {
         maps_url: mapsUrl,
         usuarioAcesso: usuarioAcesso.trim(),
         senhaAcesso: senhaAcesso.trim(),
+        role: tipoLider,
       });
 
       // 2. Salva localmente para login imediato neste navegador
@@ -95,15 +124,20 @@ export default function CadastroLiderPage() {
         usuarioOuEmail: usuarioAcesso.trim(),
         senha: senhaAcesso.trim(),
         telefone: telefoneLider.trim(),
-        celulaNome: nomeCelula.trim(),
+        celulaNome: nomeGrupoFinal,
         rede,
+        role: tipoLider,
       });
 
-      sucesso('Célula e acesso de liderança registrados no Supabase com sucesso!');
+      sucesso(
+        `Cadastro de ${
+          tipoLider === 'lider_12' ? 'Líder de 12' : 'Líder de Célula'
+        } registrado com sucesso!`
+      );
       setCadastradoComSucesso(true);
     } catch (err) {
       console.warn('Erro ao salvar no Supabase:', err);
-      sucesso('Célula registrada com sucesso!');
+      sucesso('Cadastro registrado com sucesso!');
       setCadastradoComSucesso(true);
     } finally {
       setSalvando(false);
@@ -120,24 +154,42 @@ export default function CadastroLiderPage() {
 
           <div className="space-y-2">
             <h1 className="text-2xl font-extrabold text-[#0A0A0A] tracking-tight">
-              Célula e Acesso Registrados!
+              {tipoLider === 'lider_12'
+                ? 'Líder de 12 Registrado!'
+                : 'Célula e Acesso Registrados!'}
             </h1>
             <p className="text-xs text-[#52525B] leading-relaxed">
-              Olá, <strong className="text-black">{nomeLider}</strong>! Sua célula{' '}
-              <strong className="text-black">"{nomeCelula}"</strong> foi cadastrada na rede e seu usuário de acesso <strong className="text-black">"{usuarioAcesso}"</strong> já está liberado para login.
+              Olá, <strong className="text-black">{nomeLider}</strong>! Seu acesso como{' '}
+              <strong className="text-black">
+                {tipoLider === 'lider_12' ? 'Líder de 12 (Discipulador)' : 'Líder de Célula'}
+              </strong>{' '}
+              e seu login <strong className="text-black">"{usuarioAcesso}"</strong> já estão liberados.
             </p>
           </div>
 
           <div className="p-4 rounded-xl bg-[#FAFAFA] border border-[#E4E4E7] text-xs text-left space-y-1.5">
+            <p className="text-[#52525B]">
+              <strong className="text-black">Função:</strong>{' '}
+              <span className="font-bold text-black uppercase">
+                {tipoLider === 'lider_12' ? 'Líder de 12' : 'Líder de Célula'}
+              </span>
+            </p>
             <p className="text-[#52525B]">
               <strong className="text-black">Usuário de Login:</strong> {usuarioAcesso}
             </p>
             <p className="text-[#52525B]">
               <strong className="text-black">Rede:</strong> {rede}
             </p>
-            <p className="text-[#52525B]">
-              <strong className="text-black">Encontro:</strong> {diaSemana} às {horario}
-            </p>
+            {tipoLider === 'lider_celula' && (
+              <>
+                <p className="text-[#52525B]">
+                  <strong className="text-black">Célula:</strong> {nomeCelula}
+                </p>
+                <p className="text-[#52525B]">
+                  <strong className="text-black">Encontro:</strong> {diaSemana} às {horario}
+                </p>
+              </>
+            )}
             <p className="text-[#52525B]">
               <strong className="text-black">Bairro:</strong> {bairro || 'Centro'}
             </p>
@@ -197,15 +249,28 @@ export default function CadastroLiderPage() {
       {/* Formulário Central */}
       <main className="max-w-2xl mx-auto px-4 py-8 w-full flex-1">
         <div className="mb-6 space-y-1">
-          <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#FEF08A] text-[#854D0E] mb-2">
-            <Users className="w-3.5 h-3.5" />
-            <span>Cadastro Oficial de Líderes de Célula</span>
+          <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-[#FEF08A] text-[#854D0E] mb-2">
+            {tipoLider === 'lider_12' ? (
+              <>
+                <Crown className="w-3.5 h-3.5 text-amber-700" />
+                <span>Convite Oficial // Líder de 12</span>
+              </>
+            ) : (
+              <>
+                <Users className="w-3.5 h-3.5" />
+                <span>Convite Oficial // Líder de Célula</span>
+              </>
+            )}
           </div>
           <h1 className="text-2xl font-black text-[#0A0A0A] tracking-tight">
-            Registre sua Célula e Crie seu Login
+            {tipoLider === 'lider_12'
+              ? 'Cadastro de Líder de 12 (Discipulador)'
+              : 'Registre sua Célula e Crie seu Login'}
           </h1>
           <p className="text-xs text-[#71717A]">
-            Preencha os dados da sua célula e crie sua senha para acessar o painel de líderes.
+            {convidadoPor
+              ? `Convite oficial gerado por ${convidadoPor} (Liderança dos 12).`
+              : 'Preencha suas informações para ativar seu acesso no painel de líderes.'}
           </p>
         </div>
 
@@ -213,6 +278,49 @@ export default function CadastroLiderPage() {
           onSubmit={handleSubmit}
           className="bg-white p-6 sm:p-8 rounded-[var(--radius-box,0.75rem)] border border-[#E4E4E7] shadow-sm space-y-6"
         >
+          {/* Seletor do Tipo de Liderança */}
+          <div className="p-4 rounded-xl bg-[#FAFAFA] border border-[#E4E4E7] space-y-2">
+            <label className="block text-xs font-bold uppercase tracking-tight text-[#0A0A0A]">
+              Tipo de Liderança
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setTipoLider('lider_celula')}
+                className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${
+                  tipoLider === 'lider_celula'
+                    ? 'bg-black text-[var(--accent,#FACC15)] border-black shadow-xs font-bold'
+                    : 'bg-white text-[#71717A] border-[#E4E4E7] hover:border-black'
+                }`}
+              >
+                <div className="flex items-center space-x-1.5">
+                  <Users className="w-4 h-4" />
+                  <span className="text-xs font-extrabold">Líder de Célula</span>
+                </div>
+                <p className="text-[10px] mt-1 text-inherit opacity-80">
+                  Gerencia sua célula, membros e batismos
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTipoLider('lider_12')}
+                className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${
+                  tipoLider === 'lider_12'
+                    ? 'bg-black text-[var(--accent,#FACC15)] border-black shadow-xs font-bold'
+                    : 'bg-white text-[#71717A] border-[#E4E4E7] hover:border-black'
+                }`}
+              >
+                <div className="flex items-center space-x-1.5">
+                  <Crown className="w-4 h-4" />
+                  <span className="text-xs font-extrabold">Líder de 12</span>
+                </div>
+                <p className="text-[10px] mt-1 text-inherit opacity-80">
+                  Supervisor de rede, convida outros líderes e 12
+                </p>
+              </button>
+            </div>
+          </div>
           {/* 1. Dados do Líder e Acesso */}
           <div className="space-y-4">
             <h2 className="text-sm font-extrabold text-[#0A0A0A] flex items-center space-x-2 pb-2 border-b border-[#F4F4F5]">
@@ -268,21 +376,38 @@ export default function CadastroLiderPage() {
             </div>
           </div>
 
-          {/* 2. Dados da Célula */}
+          {/* 2. Dados da Célula / Rede */}
           <div className="space-y-4 pt-2">
             <h2 className="text-sm font-extrabold text-[#0A0A0A] flex items-center space-x-2 pb-2 border-b border-[#F4F4F5]">
-              <Home className="w-4 h-4 text-[#71717A]" />
-              <span>2. Informações da Célula</span>
+              {tipoLider === 'lider_12' ? (
+                <>
+                  <Crown className="w-4 h-4 text-amber-600" />
+                  <span>2. Informações da Rede de 12</span>
+                </>
+              ) : (
+                <>
+                  <Home className="w-4 h-4 text-[#71717A]" />
+                  <span>2. Informações da Célula</span>
+                </>
+              )}
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">
                 <Input
-                  label="Nome da Célula"
-                  required
+                  label={
+                    tipoLider === 'lider_12'
+                      ? 'Nome de Referência da Rede / Discipulado (Opcional)'
+                      : 'Nome da Célula'
+                  }
+                  required={tipoLider === 'lider_celula'}
                   value={nomeCelula}
                   onChange={(e) => setNomeCelula(e.target.value)}
-                  placeholder="Ex: Célula Hype // Intensidade & Propósito"
+                  placeholder={
+                    tipoLider === 'lider_12'
+                      ? 'Ex: Rede de 12 // Superação'
+                      : 'Ex: Célula Hype // Intensidade & Propósito'
+                  }
                 />
               </div>
 
@@ -292,15 +417,13 @@ export default function CadastroLiderPage() {
                 </label>
                 <select
                   value={rede}
-                  onChange={(e) =>
-                    setRede(e.target.value as any)
-                  }
+                  onChange={(e) => setRede(e.target.value as any)}
                   className="w-full h-12 px-3 rounded-lg bg-white border border-[#E4E4E7] text-sm text-[#0A0A0A]"
                 >
-                  <option value="Homens">Rede de Homens</option>
-                  <option value="Mulheres">Rede de Mulheres</option>
                   <option value="Hype">Rede Hype (Teens / Adolescentes)</option>
                   <option value="One Way">Rede One Way (Jovens / Universitários)</option>
+                  <option value="Homens">Rede de Homens</option>
+                  <option value="Mulheres">Rede de Mulheres</option>
                   <option value="Casais">Rede de Casais</option>
                   <option value="Família">Rede Família & Casais</option>
                   <option value="Adultos">Rede Adultos</option>
@@ -308,26 +431,26 @@ export default function CadastroLiderPage() {
               </div>
 
               <Input
-                label="Bairro onde se reúnem"
+                label="Bairro de Atuação / Reunião"
                 required
                 value={bairro}
                 onChange={(e) => setBairro(e.target.value)}
-                placeholder="Ex: Coqueiral"
+                placeholder="Ex: América, Costa e Silva, Centro"
               />
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-tight text-[#0A0A0A] mb-1.5">
-                  Dia da Reunião
+                  Dia do Encontro / Reunião
                 </label>
                 <select
                   value={diaSemana}
                   onChange={(e) => setDiaSemana(e.target.value)}
                   className="w-full h-12 px-3 rounded-lg bg-white border border-[#E4E4E7] text-sm text-[#0A0A0A]"
                 >
+                  <option value="Quinta-feira">Quinta-feira</option>
                   <option value="Segunda-feira">Segunda-feira</option>
                   <option value="Terça-feira">Terça-feira</option>
                   <option value="Quarta-feira">Quarta-feira</option>
-                  <option value="Quinta-feira">Quinta-feira</option>
                   <option value="Sexta-feira">Sexta-feira</option>
                   <option value="Sábado">Sábado</option>
                 </select>
@@ -343,34 +466,40 @@ export default function CadastroLiderPage() {
 
               <div className="sm:col-span-2">
                 <Input
-                  label="Endereço da Reunião (Rua, Número e Bairro)"
+                  label="Endereço de Referência (Rua, Número e Bairro)"
                   required
                   value={endereco}
                   onChange={(e) => setEndereco(e.target.value)}
-                  placeholder="Ex: Rua Flamboyant, 450 - Coqueiral, Cascavel - PR"
+                  placeholder="Ex: Rua Blumenau, 1200 - América, Joinville - SC"
                   helperText="Utilizado para gerar o link direto no Google Maps para os participantes."
                 />
               </div>
 
-              <Input
-                label="Nome do Vice-Líder (Opcional)"
-                value={viceLider}
-                onChange={(e) => setViceLider(e.target.value)}
-                placeholder="Ex: Larissa Moura"
-              />
+              {tipoLider === 'lider_celula' && (
+                <>
+                  <Input
+                    label="Nome do Vice-Líder (Opcional)"
+                    value={viceLider}
+                    onChange={(e) => setViceLider(e.target.value)}
+                    placeholder="Ex: Larissa Moura"
+                  />
 
-              <Input
-                label="Nome do Anfitrião da Casa (Opcional)"
-                value={anfitriao}
-                onChange={(e) => setAnfitriao(e.target.value)}
-                placeholder="Ex: Família Andrade"
-              />
+                  <Input
+                    label="Nome do Anfitrião da Casa (Opcional)"
+                    value={anfitriao}
+                    onChange={(e) => setAnfitriao(e.target.value)}
+                    placeholder="Ex: Família Andrade"
+                  />
+                </>
+              )}
             </div>
           </div>
 
           <div className="pt-4 border-t border-[#E4E4E7] flex items-center justify-end">
             <Button type="submit" variant="primary" size="lg" fullWidth isLoading={salvando}>
-              Concluir Cadastro da Minha Célula e Login
+              {tipoLider === 'lider_12'
+                ? 'Concluir Cadastro de Líder de 12 e Acesso'
+                : 'Concluir Cadastro da Minha Célula e Login'}
             </Button>
           </div>
         </form>
